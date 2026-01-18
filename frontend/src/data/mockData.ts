@@ -414,5 +414,35 @@ export const users: User[] = [
     status: 'Active',
     registeredDate: '2024-01-01',
     companyId: null
+  },
+  {
+    id: 'test-super-admin-001',
+    name: 'Test Super Admin',
+    email: 'superadmin@raven.com',
+    phone: '+1 (555) 000-0001',
+    role: 'SuperAdmin',
+    status: 'Active',
+    registeredDate: '2026-01-18',
+    companyId: null
+  },
+  {
+    id: 'test-admin-001',
+    name: 'Test Company Admin',
+    email: 'admin@delka.test',
+    phone: '+1 (555) 100-0000',
+    role: 'Admin',
+    status: 'Active',
+    registeredDate: '2026-01-18',
+    companyId: 'company-001'
+  },
+  {
+    id: 'test-client-001',
+    name: 'Test Company Client',
+    email: 'client@delka.test',
+    phone: '+1 (555) 100-0009',
+    role: 'Client',
+    status: 'Active',
+    registeredDate: '2026-01-18',
+    companyId: 'company-001'
   }
 ];

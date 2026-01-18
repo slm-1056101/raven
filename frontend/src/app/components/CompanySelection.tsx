@@ -1,83 +1,48 @@
-import { Building2, CheckCircle, ArrowRight, MapPin, Phone, Mail, Plus } from 'lucide-react';
+import { Building2, CheckCircle, ArrowRight, MapPin, Phone, Mail } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Badge } from '@/app/components/ui/badge';
 import { useApp } from '@/app/context/AppContext';
 import { Company } from '@/data/mockData';
-import { useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
-import { Input } from '@/app/components/ui/input';
-import { Label } from '@/app/components/ui/label';
-import { Textarea } from '@/app/components/ui/textarea';
 import { toast } from 'sonner';
 
 export function CompanySelection() {
-  const { companies, setCurrentCompany, setCurrentView, setCurrentUser, users, addCompany } = useApp();
-  const [showNewCompanyDialog, setShowNewCompanyDialog] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    contactEmail: '',
-    contactPhone: '',
-    address: '',
+  const { companies, setCurrentCompany, setCurrentView, currentUser } = useApp();
+
+  const scopedCompanies = companies.filter((c) => {
+    if (!currentUser) return false;
+    if (currentUser.role === 'SuperAdmin') return true;
+    return c.id === currentUser.companyId;
   });
 
-  const activeCompanies = companies.filter(c => c.status === 'Active');
-  const pendingCompanies = companies.filter(c => c.status === 'Pending');
+  const activeCompanies = scopedCompanies.filter((c) => c.status === 'Active');
+  const pendingCompanies = scopedCompanies.filter((c) => c.status === 'Pending');
 
-  const handleSelectCompany = (company: Company, role: 'client' | 'admin') => {
+  const handleSelectCompany = (company: Company) => {
+    if (!currentUser) {
+      toast.error('Please login to continue');
+      setCurrentView('login');
+      return;
+    }
+
     setCurrentCompany(company);
-    
-    // Set a mock user based on role
-    if (role === 'admin') {
-      const adminUser = users.find(u => u.companyId === company.id && u.role === 'Admin');
-      if (adminUser) {
-        setCurrentUser(adminUser);
-        setCurrentView('admin');
-      }
-    } else {
-      const clientUser = users.find(u => u.companyId === company.id && u.role === 'Client');
-      if (clientUser) {
-        setCurrentUser(clientUser);
-        setCurrentView('client');
-      }
-    }
-  };
 
-  const handleSuperAdminAccess = () => {
-    const superAdmin = users.find(u => u.role === 'SuperAdmin');
-    if (superAdmin) {
-      setCurrentUser(superAdmin);
-      setCurrentCompany(null);
+    if (currentUser.role === 'SuperAdmin') {
       setCurrentView('super-admin');
+      return;
     }
-  };
 
-  const handleRegisterCompany = () => {
-    const newCompany: Company = {
-      id: `company-${Date.now()}`,
-      name: formData.name,
-      logo: '🏢',
-      description: formData.description,
-      primaryColor: '#2563EB',
-      status: 'Pending',
-      registeredDate: new Date().toISOString().split('T')[0],
-      contactEmail: formData.contactEmail,
-      contactPhone: formData.contactPhone,
-      address: formData.address,
-      adminUserId: `user-${Date.now()}`
-    };
+    if (currentUser.role === 'Admin') {
+      setCurrentView('admin');
+      return;
+    }
 
-    addCompany(newCompany);
-    toast.success('Company registration submitted! Pending approval.');
-    setShowNewCompanyDialog(false);
-    setFormData({
-      name: '',
-      description: '',
-      contactEmail: '',
-      contactPhone: '',
-      address: '',
-    });
+    if (currentUser.role === 'Client') {
+      setCurrentView('client');
+      return;
+    }
+
+    toast.error('Unsupported user role');
   };
 
   const getStatusColor = (status: string) => {
@@ -128,17 +93,6 @@ export function CompanySelection() {
             </p>
           </div>
 
-          {/* Register New Company */}
-          <div className="flex justify-center">
-            <Button
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 gap-2"
-              onClick={() => setShowNewCompanyDialog(true)}
-            >
-              <Plus className="h-4 w-4" />
-              Register New Company
-            </Button>
-          </div>
-
           {/* Active Companies Grid */}
           {activeCompanies.length > 0 && (
             <div className="space-y-6">
@@ -181,16 +135,9 @@ export function CompanySelection() {
                       <div className="space-y-2 pt-2">
                         <Button
                           className="w-full bg-blue-600 hover:bg-blue-700 gap-2"
-                          onClick={() => handleSelectCompany(company, 'client')}
+                          onClick={() => handleSelectCompany(company)}
                         >
-                          Enter as Client
-                          <ArrowRight className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          className="w-full bg-purple-600 hover:bg-purple-700 gap-2"
-                          onClick={() => handleSelectCompany(company, 'admin')}
-                        >
-                          Enter as Admin
+                          Continue
                           <ArrowRight className="h-4 w-4" />
                         </Button>
                       </div>
@@ -234,107 +181,33 @@ export function CompanySelection() {
           )}
 
           {/* Super Admin Access */}
-          <div className="pt-12 border-t">
-            <Card className="max-w-md mx-auto bg-gradient-to-br from-gray-50 to-gray-100">
-              <CardHeader>
-                <CardTitle className="text-center">System Administrator</CardTitle>
-                <CardDescription className="text-center">
-                  Access all companies and system-wide settings
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button
-                  className="w-full bg-gray-800 hover:bg-gray-900 gap-2"
-                  onClick={handleSuperAdminAccess}
-                >
-                  <Building2 className="h-4 w-4" />
-                  Super Admin Portal
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+          {currentUser?.role === 'SuperAdmin' && (
+            <div className="pt-12 border-t">
+              <Card className="max-w-md mx-auto bg-gradient-to-br from-gray-50 to-gray-100">
+                <CardHeader>
+                  <CardTitle className="text-center">System Administrator</CardTitle>
+                  <CardDescription className="text-center">
+                    Access all companies and system-wide settings
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    className="w-full bg-gray-800 hover:bg-gray-900 gap-2"
+                    onClick={() => setCurrentView('super-admin')}
+                  >
+                    <Building2 className="h-4 w-4" />
+                    Super Admin Portal
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Register New Company Dialog */}
-      <Dialog open={showNewCompanyDialog} onOpenChange={setShowNewCompanyDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Register New Company</DialogTitle>
-            <DialogDescription>
-              Submit your company information for approval. You'll receive an email once approved.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="companyName">Company Name *</Label>
-              <Input
-                id="companyName"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Your Real Estate Company"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">Description *</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Describe your company's focus and expertise..."
-                rows={3}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="contactEmail">Contact Email *</Label>
-                <Input
-                  id="contactEmail"
-                  type="email"
-                  value={formData.contactEmail}
-                  onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
-                  placeholder="contact@company.com"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="contactPhone">Contact Phone *</Label>
-                <Input
-                  id="contactPhone"
-                  value={formData.contactPhone}
-                  onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })}
-                  placeholder="+1 (555) 000-0000"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="address">Business Address *</Label>
-              <Input
-                id="address"
-                value={formData.address}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="123 Main Street, City, State ZIP"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewCompanyDialog(false)}>
-              Cancel
-            </Button>
-            <Button
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={handleRegisterCompany}
-              disabled={!formData.name || !formData.contactEmail}
-            >
-              Submit Registration
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {null}
     </div>
   );
 }

@@ -1,11 +1,17 @@
 import { useMemo, useState } from 'react';
-import { Building2, CheckCircle, Shield, Users, Building, Power, ArrowLeft } from 'lucide-react';
+import { Building2, CheckCircle, Shield, Users, Building, Power, ArrowLeft, Pencil, Trash2 } from 'lucide-react';
 import { useApp } from '@/app/context/AppContext';
 import { Badge } from '@/app/components/ui/badge';
 import { Button } from '@/app/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/app/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
+import { Input } from '@/app/components/ui/input';
+import { Label } from '@/app/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/app/components/ui/table';
+import { Textarea } from '@/app/components/ui/textarea';
+import { toast } from 'sonner';
 
 function statusBadgeVariant(status: string) {
   if (status === 'Active') return 'bg-green-600 text-white';
@@ -18,14 +24,86 @@ export function SuperAdminDashboard() {
   const {
     companies,
     users,
+    addCompany,
     setCurrentView,
     setCurrentCompany,
     setCurrentUser,
     updateCompany,
+    deleteCompany,
     updateUser,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'companies' | 'users'>('overview');
+  const [showNewCompanyDialog, setShowNewCompanyDialog] = useState(false);
+  const [companyFormData, setCompanyFormData] = useState({
+    name: '',
+    description: '',
+    contactEmail: '',
+    contactPhone: '',
+    address: '',
+  });
+
+  const [showEditCompanyDialog, setShowEditCompanyDialog] = useState(false);
+  const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
+  const [editCompanyFormData, setEditCompanyFormData] = useState({
+    name: '',
+    description: '',
+    contactEmail: '',
+    contactPhone: '',
+    address: '',
+  });
+
+  const handleRegisterCompany = () => {
+    const newCompany = {
+      id: `company-${Date.now()}`,
+      name: companyFormData.name,
+      logo: '🏢',
+      description: companyFormData.description,
+      primaryColor: '#2563EB',
+      status: 'Pending',
+      registeredDate: new Date().toISOString().split('T')[0],
+      contactEmail: companyFormData.contactEmail,
+      contactPhone: companyFormData.contactPhone,
+      address: companyFormData.address,
+      adminUserId: `user-${Date.now()}`,
+    };
+    addCompany(newCompany);
+    toast.success('Company registration submitted! Pending approval.');
+    setShowNewCompanyDialog(false);
+    setCompanyFormData({
+      name: '',
+      description: '',
+      contactEmail: '',
+      contactPhone: '',
+      address: '',
+    });
+  };
+
+  const openEditCompany = (company: any) => {
+    setEditingCompanyId(company.id);
+    setEditCompanyFormData({
+      name: company.name ?? '',
+      description: company.description ?? '',
+      contactEmail: company.contactEmail ?? '',
+      contactPhone: company.contactPhone ?? '',
+      address: company.address ?? '',
+    });
+    setShowEditCompanyDialog(true);
+  };
+
+  const handleUpdateCompany = () => {
+    if (!editingCompanyId) return;
+    updateCompany(editingCompanyId, {
+      name: editCompanyFormData.name,
+      description: editCompanyFormData.description,
+      contactEmail: editCompanyFormData.contactEmail,
+      contactPhone: editCompanyFormData.contactPhone,
+      address: editCompanyFormData.address,
+    });
+    toast.success('Company updated');
+    setShowEditCompanyDialog(false);
+    setEditingCompanyId(null);
+  };
 
   const metrics = useMemo(() => {
     const activeCompanies = companies.filter((c) => c.status === 'Active').length;
@@ -174,8 +252,18 @@ export function SuperAdminDashboard() {
           <TabsContent value="companies" className="mt-6">
             <Card>
               <CardHeader>
-                <CardTitle>Company management</CardTitle>
-                <CardDescription>Approve pending companies, disable access, and inspect tenant metadata</CardDescription>
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                  <div>
+                    <CardTitle>Company management</CardTitle>
+                    <CardDescription>Approve pending companies, disable access, and inspect tenant metadata</CardDescription>
+                  </div>
+                  <Button
+                    className="bg-indigo-600 hover:bg-indigo-700"
+                    onClick={() => setShowNewCompanyDialog(true)}
+                  >
+                    Register New Company
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -212,6 +300,16 @@ export function SuperAdminDashboard() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-2"
+                              onClick={() => openEditCompany(company)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                              Edit
+                            </Button>
+
                             {company.status === 'Pending' && (
                               <Button
                                 size="sm"
@@ -246,6 +344,34 @@ export function SuperAdminDashboard() {
                                 Reactivate
                               </Button>
                             )}
+
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="sm" variant="outline" className="gap-2">
+                                  <Trash2 className="h-4 w-4" />
+                                  Delete
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete company</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently remove the company from the system.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => {
+                                      deleteCompany(company.id);
+                                      toast.success('Company deleted');
+                                    }}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -254,6 +380,166 @@ export function SuperAdminDashboard() {
                 </Table>
               </CardContent>
             </Card>
+
+            <Dialog open={showNewCompanyDialog} onOpenChange={setShowNewCompanyDialog}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Register New Company</DialogTitle>
+                  <DialogDescription>
+                    Submit company information. The company will start in Pending status and can be approved from this portal.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="companyName">Company Name *</Label>
+                    <Input
+                      id="companyName"
+                      value={companyFormData.name}
+                      onChange={(e) => setCompanyFormData({ ...companyFormData, name: e.target.value })}
+                      placeholder="Your Real Estate Company"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description *</Label>
+                    <Textarea
+                      id="description"
+                      value={companyFormData.description}
+                      onChange={(e) => setCompanyFormData({ ...companyFormData, description: e.target.value })}
+                      placeholder="Describe the company's focus and expertise..."
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="contactEmail">Contact Email *</Label>
+                      <Input
+                        id="contactEmail"
+                        type="email"
+                        value={companyFormData.contactEmail}
+                        onChange={(e) => setCompanyFormData({ ...companyFormData, contactEmail: e.target.value })}
+                        placeholder="contact@company.com"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="contactPhone">Contact Phone *</Label>
+                      <Input
+                        id="contactPhone"
+                        value={companyFormData.contactPhone}
+                        onChange={(e) => setCompanyFormData({ ...companyFormData, contactPhone: e.target.value })}
+                        placeholder="+1 (555) 000-0000"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Business Address *</Label>
+                    <Input
+                      id="address"
+                      value={companyFormData.address}
+                      onChange={(e) => setCompanyFormData({ ...companyFormData, address: e.target.value })}
+                      placeholder="123 Main Street, City, State ZIP"
+                    />
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowNewCompanyDialog(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    className="bg-indigo-600 hover:bg-indigo-700"
+                    onClick={handleRegisterCompany}
+                    disabled={!companyFormData.name || !companyFormData.contactEmail}
+                  >
+                    Submit Registration
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={showEditCompanyDialog} onOpenChange={setShowEditCompanyDialog}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Edit Company</DialogTitle>
+                  <DialogDescription>
+                    Update company details.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="editCompanyName">Company Name *</Label>
+                    <Input
+                      id="editCompanyName"
+                      value={editCompanyFormData.name}
+                      onChange={(e) => setEditCompanyFormData({ ...editCompanyFormData, name: e.target.value })}
+                      placeholder="Company name"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="editDescription">Description *</Label>
+                    <Textarea
+                      id="editDescription"
+                      value={editCompanyFormData.description}
+                      onChange={(e) => setEditCompanyFormData({ ...editCompanyFormData, description: e.target.value })}
+                      placeholder="Describe the company..."
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="editContactEmail">Contact Email *</Label>
+                      <Input
+                        id="editContactEmail"
+                        type="email"
+                        value={editCompanyFormData.contactEmail}
+                        onChange={(e) => setEditCompanyFormData({ ...editCompanyFormData, contactEmail: e.target.value })}
+                        placeholder="contact@company.com"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="editContactPhone">Contact Phone *</Label>
+                      <Input
+                        id="editContactPhone"
+                        value={editCompanyFormData.contactPhone}
+                        onChange={(e) => setEditCompanyFormData({ ...editCompanyFormData, contactPhone: e.target.value })}
+                        placeholder="+1 (555) 000-0000"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="editAddress">Business Address *</Label>
+                    <Input
+                      id="editAddress"
+                      value={editCompanyFormData.address}
+                      onChange={(e) => setEditCompanyFormData({ ...editCompanyFormData, address: e.target.value })}
+                      placeholder="123 Main Street, City, State ZIP"
+                    />
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowEditCompanyDialog(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    className="bg-indigo-600 hover:bg-indigo-700"
+                    onClick={handleUpdateCompany}
+                    disabled={!editCompanyFormData.name || !editCompanyFormData.contactEmail}
+                  >
+                    Save Changes
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="users" className="mt-6">

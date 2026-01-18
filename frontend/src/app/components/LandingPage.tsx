@@ -33,8 +33,8 @@ export function LandingPage() {
           </p>
 
           {/* Role Selection Cards */}
-          <div className="grid md:grid-cols-2 gap-8 mt-12">
-            {/* Client Portal Card */}
+          <div className="grid gap-8 mt-12 max-w-xl mx-auto">
+            {/* Access Portal Card */}
             <Card className="rounded-2xl shadow-lg hover:shadow-xl transition-shadow cursor-pointer group">
               <CardHeader className="space-y-4">
                 <div className="mx-auto w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -42,7 +42,7 @@ export function LandingPage() {
                 </div>
                 <CardTitle className="text-2xl">Access Portal</CardTitle>
                 <CardDescription className="text-base">
-                  Browse properties and manage applications
+                  Login to access your company portal
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -68,51 +68,9 @@ export function LandingPage() {
                 </div>
                 <Button 
                   className="w-full h-12 bg-blue-600 hover:bg-blue-700"
-                  onClick={() => setCurrentView('company-selection')}
+                  onClick={() => setCurrentView('login')}
                 >
-                  Select Your Company
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Admin Dashboard Card */}
-            <Card className="rounded-2xl shadow-lg hover:shadow-xl transition-shadow cursor-pointer group">
-              <CardHeader className="space-y-4">
-                <div className="mx-auto w-20 h-20 rounded-full bg-purple-100 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Building2 className="h-10 w-10 text-purple-600" />
-                </div>
-                <CardTitle className="text-2xl">Admin Dashboard</CardTitle>
-                <CardDescription className="text-base">
-                  Manage properties and review applications
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-3 text-left">
-                  <div className="flex items-start gap-2">
-                    <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-gray-700">
-                      Company analytics and reporting
-                    </span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-gray-700">
-                      Property inventory management
-                    </span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-gray-700">
-                      Application review workflow
-                    </span>
-                  </div>
-                </div>
-                <Button 
-                  className="w-full h-12 bg-purple-600 hover:bg-purple-700"
-                  onClick={() => setCurrentView('company-selection')}
-                >
-                  Select Your Company
+                  Access Portal
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </CardContent>

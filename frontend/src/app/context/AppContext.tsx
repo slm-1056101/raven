@@ -6,12 +6,13 @@ interface AppContextType {
   applications: Application[];
   users: User[];
   companies: Company[];
-  currentView: 'landing' | 'company-selection' | 'client' | 'admin' | 'super-admin';
+  currentView: 'landing' | 'login' | 'company-selection' | 'client' | 'admin' | 'super-admin';
   currentCompany: Company | null;
   currentUser: User | null;
-  setCurrentView: (view: 'landing' | 'company-selection' | 'client' | 'admin' | 'super-admin') => void;
+  setCurrentView: (view: 'landing' | 'login' | 'company-selection' | 'client' | 'admin' | 'super-admin') => void;
   setCurrentCompany: (company: Company | null) => void;
   setCurrentUser: (user: User | null) => void;
+  resetDemoData: () => Promise<void>;
   addProperty: (property: Property) => void;
   updateProperty: (id: string, property: Partial<Property>) => void;
   deleteProperty: (id: string) => void;
@@ -20,6 +21,7 @@ interface AppContextType {
   updateUser: (id: string, user: Partial<User>) => void;
   addCompany: (company: Company) => void;
   updateCompany: (id: string, company: Partial<Company>) => void;
+  deleteCompany: (id: string) => void;
   // Filtered data by current company
   getCompanyProperties: () => Property[];
   getCompanyApplications: () => Application[];
@@ -33,9 +35,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [applications, setApplications] = useState<Application[]>(initialApplications);
   const [users, setUsers] = useState<User[]>(initialUsers);
   const [companies, setCompanies] = useState<Company[]>(initialCompanies);
-  const [currentView, setCurrentView] = useState<'landing' | 'company-selection' | 'client' | 'admin' | 'super-admin'>('landing');
+  const [currentView, setCurrentView] = useState<'landing' | 'login' | 'company-selection' | 'client' | 'admin' | 'super-admin'>('landing');
   const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  const resetDemoData = async () => {
+    const data = await import('@/data/mockData');
+    setProperties(data.properties);
+    setApplications(data.applications);
+    setUsers(data.users);
+    setCompanies(data.companies);
+    setCurrentCompany(null);
+    setCurrentUser(null);
+    setCurrentView('login');
+  };
 
   const addProperty = (property: Property) => {
     setProperties(prev => [...prev, property]);
@@ -77,6 +90,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  const deleteCompany = (id: string) => {
+    setCompanies(prev => prev.filter(company => company.id !== id));
+  };
+
   // Filter data by current company
   const getCompanyProperties = () => {
     if (!currentCompany) return properties;
@@ -106,6 +123,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setCurrentView,
         setCurrentCompany,
         setCurrentUser,
+        resetDemoData,
         addProperty,
         updateProperty,
         deleteProperty,
@@ -114,6 +132,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         updateUser,
         addCompany,
         updateCompany,
+        deleteCompany,
         getCompanyProperties,
         getCompanyApplications,
         getCompanyUsers,
