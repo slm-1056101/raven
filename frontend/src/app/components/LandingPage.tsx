@@ -14,7 +14,7 @@ export function LandingPage() {
           <div className="flex items-center gap-3">
             <Building2 className="h-8 w-8 text-blue-600" />
             <div>
-              <h1 className="text-2xl font-bold">Delka System</h1>
+              <h1 className="text-2xl font-bold">Raven</h1>
               <p className="text-sm text-gray-600">Multi-Tenant Property Management Platform</p>
             </div>
           </div>
@@ -25,7 +25,7 @@ export function LandingPage() {
       <div className="container mx-auto px-4 py-16">
         <div className="max-w-4xl mx-auto text-center space-y-6">
           <h2 className="text-5xl font-bold text-gray-900">
-            Welcome to Delka System
+            Welcome to Raven
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Your comprehensive multi-tenant platform for managing vacant land acquisitions, applications, 

@@ -102,7 +102,7 @@ export function CompanySelection() {
             <div className="flex items-center gap-3">
               <Building2 className="h-8 w-8 text-blue-600" />
               <div>
-                <h1 className="text-2xl font-bold">Delka System</h1>
+                <h1 className="text-2xl font-bold">Raven</h1>
                 <p className="text-sm text-gray-600">Multi-Tenant Property Management Platform</p>
               </div>
             </div>

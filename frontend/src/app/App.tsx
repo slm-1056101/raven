@@ -3,6 +3,7 @@ import { LandingPage } from '@/app/components/LandingPage';
 import { CompanySelection } from '@/app/components/CompanySelection';
 import { ClientPortal } from '@/app/components/ClientPortal';
 import { AdminDashboard } from '@/app/components/AdminDashboard';
+import { SuperAdminDashboard } from '@/app/components/SuperAdminDashboard';
 import { Toaster } from '@/app/components/ui/sonner';
 
 function AppContent() {
@@ -14,7 +15,7 @@ function AppContent() {
       {currentView === 'company-selection' && <CompanySelection />}
       {currentView === 'client' && <ClientPortal />}
       {currentView === 'admin' && <AdminDashboard />}
-      {currentView === 'super-admin' && <div className="p-8 text-center">Super Admin Dashboard Coming Soon</div>}
+      {currentView === 'super-admin' && <SuperAdminDashboard />}
       <Toaster />
     </>
   );
