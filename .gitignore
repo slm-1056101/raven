@@ -54,6 +54,14 @@ ENV/
 /frontend/dist/
 /backend/dist/
 
+# Laravel backend
+/backend/vendor/
+/backend/.env
+/backend/.env.*
+/backend/.phpunit.result.cache
+/backend/public/hot
+/backend/storage/*.key
+
 # Misc
 *.local
 *.cache
