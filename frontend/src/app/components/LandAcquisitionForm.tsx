@@ -9,8 +9,9 @@ import { Textarea } from '@/app/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
 import { Progress } from '@/app/components/ui/progress';
 import { useApp } from '@/app/context/AppContext';
-import { Property } from '@/data/mockData';
 import { toast } from 'sonner';
+
+import type { Property } from '@/app/types';
 
 interface LandAcquisitionFormProps {
   property: Property;
@@ -31,7 +32,7 @@ interface FormData {
 }
 
 export function LandAcquisitionForm({ property, onClose }: LandAcquisitionFormProps) {
-  const { addApplication, currentCompany } = useApp();
+  const { createApplication, currentCompany, currentUser, authToken } = useApp();
   const [currentStep, setCurrentStep] = useState(1);
   const [idDocumentFile, setIdDocumentFile] = useState<File | null>(null);
   const [proofOfFundsFile, setProofOfFundsFile] = useState<File | null>(null);
@@ -65,30 +66,41 @@ export function LandAcquisitionForm({ property, onClose }: LandAcquisitionFormPr
       return;
     }
 
-    // Submit application
-    const newApplication = {
-      id: `app-${Date.now()}`,
-      propertyId: property.id,
-      userId: 'user-001', // Mock user ID
-      applicantName: data.fullName,
-      applicantEmail: data.email,
-      applicantPhone: data.phone,
-      applicantAddress: data.address,
-      offerAmount: data.offerAmount,
-      financingMethod: data.financingMethod,
-      intendedUse: data.intendedUse,
-      status: 'Pending' as const,
-      dateApplied: new Date().toISOString().split('T')[0],
-      documents: {
-        idDocument: idDocumentFile?.name || 'id_document.pdf',
-        proofOfFunds: proofOfFundsFile?.name || 'proof_of_funds.pdf',
-      },
-      companyId: currentCompany?.id || property.companyId, // Use current company or property's company
-    };
+    if (!authToken) {
+      toast.error('Missing auth token');
+      return;
+    }
+    const companyId = currentCompany?.id || property.companyId;
+    if (!companyId) {
+      toast.error('Missing company');
+      return;
+    }
 
-    addApplication(newApplication);
-    toast.success('Application submitted successfully!');
-    onClose();
+    (async () => {
+      try {
+        await createApplication(authToken, {
+          propertyId: property.id,
+          userId: currentUser?.id ?? null,
+          applicantName: data.fullName,
+          applicantEmail: data.email,
+          applicantPhone: data.phone,
+          applicantAddress: data.address,
+          offerAmount: data.offerAmount,
+          financingMethod: data.financingMethod,
+          intendedUse: data.intendedUse,
+          status: 'Pending',
+          documents: {
+            idDocument: idDocumentFile?.name || null,
+            proofOfFunds: proofOfFundsFile?.name || null,
+          },
+          companyId,
+        } as any);
+        toast.success('Application submitted successfully!');
+        onClose();
+      } catch (err: any) {
+        toast.error(err?.message || 'Failed to submit application');
+      }
+    })();
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'id' | 'funds') => {

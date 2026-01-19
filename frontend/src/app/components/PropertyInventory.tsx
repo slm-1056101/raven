@@ -11,11 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/app/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/app/components/ui/alert-dialog';
 import { useApp } from '@/app/context/AppContext';
-import { Property } from '@/data/mockData';
 import { toast } from 'sonner';
 
+import type { Property } from '@/app/types';
+
 export function PropertyInventory() {
-  const { getCompanyProperties, addProperty, updateProperty, deleteProperty, currentCompany } = useApp();
+  const { getCompanyProperties, createProperty, updateProperty, deleteProperty, currentCompany, authToken } = useApp();
   const properties = getCompanyProperties();
   const [searchQuery, setSearchQuery] = useState('');
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
@@ -59,33 +60,48 @@ export function PropertyInventory() {
   };
 
   const handleSave = () => {
-    if (editingProperty) {
-      updateProperty(editingProperty.id, formData);
-      toast.success('Property updated successfully');
-    } else {
-      const newProperty: Property = {
-        id: `prop-${Date.now()}`,
-        title: formData.title || '',
-        description: formData.description || '',
-        location: formData.location || '',
-        price: formData.price || 0,
-        size: formData.size || 0,
-        status: formData.status as Property['status'] || 'Available',
-        type: formData.type as Property['type'] || 'Residential',
-        imageUrl: formData.imageUrl || '',
-        features: formData.features || [],
-        companyId: currentCompany?.id || '', // Add company ID
-      };
-      addProperty(newProperty);
-      toast.success('Property added successfully');
+    if (!authToken) {
+      toast.error('Missing auth token');
+      return;
     }
-    setShowEditDialog(false);
+    if (!currentCompany) {
+      toast.error('Please select a company');
+      return;
+    }
+
+    (async () => {
+      try {
+        if (editingProperty) {
+          await updateProperty(authToken, editingProperty.id, formData);
+          toast.success('Property updated successfully');
+        } else {
+          await createProperty(authToken, {
+            ...formData,
+            companyId: currentCompany.id,
+          });
+          toast.success('Property added successfully');
+        }
+        setShowEditDialog(false);
+      } catch (err: any) {
+        toast.error(err?.message || 'Failed to save property');
+      }
+    })();
   };
 
   const handleDelete = (id: string) => {
-    deleteProperty(id);
-    toast.success('Property deleted successfully');
-    setDeletingPropertyId(null);
+    if (!authToken) {
+      toast.error('Missing auth token');
+      return;
+    }
+    (async () => {
+      try {
+        await deleteProperty(authToken, id);
+        toast.success('Property deleted successfully');
+        setDeletingPropertyId(null);
+      } catch (err: any) {
+        toast.error(err?.message || 'Failed to delete property');
+      }
+    })();
   };
 
   const getStatusColor = (status: string) => {

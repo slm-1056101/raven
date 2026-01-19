@@ -7,8 +7,13 @@ import { useApp } from '@/app/context/AppContext';
 import { format } from 'date-fns';
 
 export function MyApplications() {
-  const { getCompanyApplications, getCompanyProperties } = useApp();
-  const applications = getCompanyApplications();
+  const { getCompanyApplications, getCompanyProperties, currentUser } = useApp();
+  const applications = getCompanyApplications().filter((a) => {
+    if (!currentUser) return false;
+    if (a.userId && a.userId === currentUser.id) return true;
+    if (a.applicantEmail && a.applicantEmail.toLowerCase() === currentUser.email.toLowerCase()) return true;
+    return false;
+  });
   const properties = getCompanyProperties();
 
   const getPropertyTitle = (propertyId: string) => {

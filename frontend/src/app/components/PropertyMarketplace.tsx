@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/app/components/ui/badge';
 import { useApp } from '@/app/context/AppContext';
 import { LandAcquisitionForm } from '@/app/components/LandAcquisitionForm';
-import { Property } from '@/data/mockData';
+import type { Property } from '@/app/types';
 
 export function PropertyMarketplace() {
   const { getCompanyProperties, currentCompany } = useApp();

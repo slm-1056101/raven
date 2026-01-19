@@ -24,7 +24,8 @@ export function SuperAdminDashboard() {
   const {
     companies,
     users,
-    addCompany,
+    authToken,
+    createCompany,
     setCurrentView,
     setCurrentCompany,
     setCurrentUser,
@@ -54,29 +55,36 @@ export function SuperAdminDashboard() {
   });
 
   const handleRegisterCompany = () => {
-    const newCompany = {
-      id: `company-${Date.now()}`,
-      name: companyFormData.name,
-      logo: '🏢',
-      description: companyFormData.description,
-      primaryColor: '#2563EB',
-      status: 'Pending',
-      registeredDate: new Date().toISOString().split('T')[0],
-      contactEmail: companyFormData.contactEmail,
-      contactPhone: companyFormData.contactPhone,
-      address: companyFormData.address,
-      adminUserId: `user-${Date.now()}`,
-    };
-    addCompany(newCompany);
-    toast.success('Company registration submitted! Pending approval.');
-    setShowNewCompanyDialog(false);
-    setCompanyFormData({
-      name: '',
-      description: '',
-      contactEmail: '',
-      contactPhone: '',
-      address: '',
-    });
+    if (!authToken) {
+      toast.error('Missing auth token');
+      return;
+    }
+
+    (async () => {
+      try {
+        await createCompany(authToken, {
+          name: companyFormData.name,
+          description: companyFormData.description,
+          logo: '🏢',
+          primaryColor: '#2563EB',
+          status: 'Pending',
+          contactEmail: companyFormData.contactEmail,
+          contactPhone: companyFormData.contactPhone,
+          address: companyFormData.address,
+        } as any);
+        toast.success('Company created');
+        setShowNewCompanyDialog(false);
+        setCompanyFormData({
+          name: '',
+          description: '',
+          contactEmail: '',
+          contactPhone: '',
+          address: '',
+        });
+      } catch (err: any) {
+        toast.error(err?.message || 'Failed to create company');
+      }
+    })();
   };
 
   const openEditCompany = (company: any) => {
@@ -93,16 +101,27 @@ export function SuperAdminDashboard() {
 
   const handleUpdateCompany = () => {
     if (!editingCompanyId) return;
-    updateCompany(editingCompanyId, {
-      name: editCompanyFormData.name,
-      description: editCompanyFormData.description,
-      contactEmail: editCompanyFormData.contactEmail,
-      contactPhone: editCompanyFormData.contactPhone,
-      address: editCompanyFormData.address,
-    });
-    toast.success('Company updated');
-    setShowEditCompanyDialog(false);
-    setEditingCompanyId(null);
+    if (!authToken) {
+      toast.error('Missing auth token');
+      return;
+    }
+
+    (async () => {
+      try {
+        await updateCompany(authToken, editingCompanyId, {
+          name: editCompanyFormData.name,
+          description: editCompanyFormData.description,
+          contactEmail: editCompanyFormData.contactEmail,
+          contactPhone: editCompanyFormData.contactPhone,
+          address: editCompanyFormData.address,
+        });
+        toast.success('Company updated');
+        setShowEditCompanyDialog(false);
+        setEditingCompanyId(null);
+      } catch (err: any) {
+        toast.error(err?.message || 'Failed to update company');
+      }
+    })();
   };
 
   const metrics = useMemo(() => {
@@ -314,7 +333,13 @@ export function SuperAdminDashboard() {
                               <Button
                                 size="sm"
                                 className="bg-green-600 hover:bg-green-700 gap-2"
-                                onClick={() => updateCompany(company.id, { status: 'Active' })}
+                                onClick={() => {
+                                  if (!authToken) {
+                                    toast.error('Missing auth token');
+                                    return;
+                                  }
+                                  updateCompany(authToken, company.id, { status: 'Active' });
+                                }}
                               >
                                 <CheckCircle className="h-4 w-4" />
                                 Approve
@@ -326,7 +351,13 @@ export function SuperAdminDashboard() {
                                 size="sm"
                                 variant="outline"
                                 className="gap-2"
-                                onClick={() => updateCompany(company.id, { status: 'Inactive' })}
+                                onClick={() => {
+                                  if (!authToken) {
+                                    toast.error('Missing auth token');
+                                    return;
+                                  }
+                                  updateCompany(authToken, company.id, { status: 'Inactive' });
+                                }}
                               >
                                 <Power className="h-4 w-4" />
                                 Deactivate
@@ -338,7 +369,13 @@ export function SuperAdminDashboard() {
                                 size="sm"
                                 variant="outline"
                                 className="gap-2"
-                                onClick={() => updateCompany(company.id, { status: 'Active' })}
+                                onClick={() => {
+                                  if (!authToken) {
+                                    toast.error('Missing auth token');
+                                    return;
+                                  }
+                                  updateCompany(authToken, company.id, { status: 'Active' });
+                                }}
                               >
                                 <Power className="h-4 w-4" />
                                 Reactivate
@@ -363,7 +400,11 @@ export function SuperAdminDashboard() {
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                                   <AlertDialogAction
                                     onClick={() => {
-                                      deleteCompany(company.id);
+                                      if (!authToken) {
+                                        toast.error('Missing auth token');
+                                        return;
+                                      }
+                                      deleteCompany(authToken, company.id);
                                       toast.success('Company deleted');
                                     }}
                                   >
@@ -590,7 +631,13 @@ export function SuperAdminDashboard() {
                                   variant="outline"
                                   className="gap-2"
                                   disabled={user.role === 'SuperAdmin'}
-                                  onClick={() => updateUser(user.id, { status: 'Inactive' })}
+                                  onClick={() => {
+                                    if (!authToken) {
+                                      toast.error('Missing auth token');
+                                      return;
+                                    }
+                                    updateUser(authToken, user.id, { status: 'Inactive' });
+                                  }}
                                 >
                                   <Power className="h-4 w-4" />
                                   Deactivate
@@ -599,7 +646,13 @@ export function SuperAdminDashboard() {
                                 <Button
                                   size="sm"
                                   className="bg-green-600 hover:bg-green-700 gap-2"
-                                  onClick={() => updateUser(user.id, { status: 'Active' })}
+                                  onClick={() => {
+                                    if (!authToken) {
+                                      toast.error('Missing auth token');
+                                      return;
+                                    }
+                                    updateUser(authToken, user.id, { status: 'Active' });
+                                  }}
                                 >
                                   <Power className="h-4 w-4" />
                                   Activate

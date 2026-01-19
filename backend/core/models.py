@@ -92,6 +92,19 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.email
 
 
+class CompanyMembership(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='company_memberships')
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='memberships')
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        unique_together = ('user', 'company')
+
+    def __str__(self) -> str:
+        return f"{self.user.email} -> {self.company.name}"
+
+
 class Property(models.Model):
     class Status(models.TextChoices):
         AVAILABLE = 'Available'

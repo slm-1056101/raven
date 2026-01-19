@@ -1,13 +1,29 @@
-from rest_framework import serializers
+import datetime
 
-from .models import Application, Company, Property, User
+from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
+
+from .models import Application, Company, CompanyMembership, Property, User
+
+
+class CoerceDateField(serializers.DateField):
+    def to_representation(self, value):
+        if isinstance(value, datetime.datetime):
+            value = value.date()
+        return super().to_representation(value)
 
 
 class CompanySerializer(serializers.ModelSerializer):
     primaryColor = serializers.CharField(source='primary_color', required=False, allow_blank=True)
     contactEmail = serializers.EmailField(source='contact_email', required=False, allow_blank=True)
     contactPhone = serializers.CharField(source='contact_phone', required=False, allow_blank=True)
-    registeredDate = serializers.DateField(source='registered_date', required=False)
+    registeredDate = serializers.SerializerMethodField()
+
+    def get_registeredDate(self, obj):
+        value = getattr(obj, 'registered_date', None)
+        if isinstance(value, datetime.datetime):
+            return value.date()
+        return value
 
     class Meta:
         model = Company
@@ -27,7 +43,17 @@ class CompanySerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     companyId = serializers.UUIDField(source='company.id', read_only=True)
-    registeredDate = serializers.DateField(source='registered_date', read_only=True)
+    companyIds = serializers.SerializerMethodField()
+    registeredDate = serializers.SerializerMethodField()
+
+    def get_registeredDate(self, obj):
+        value = getattr(obj, 'registered_date', None)
+        if isinstance(value, datetime.datetime):
+            return value.date()
+        return value
+
+    def get_companyIds(self, obj):
+        return [str(cid) for cid in obj.company_memberships.values_list('company_id', flat=True)]
 
     class Meta:
         model = User
@@ -40,13 +66,69 @@ class UserSerializer(serializers.ModelSerializer):
             'status',
             'registeredDate',
             'companyId',
+            'companyIds',
         )
+
+
+class ClientSignupSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=255)
+    email = serializers.EmailField()
+    phone = serializers.CharField(max_length=64, required=False, allow_blank=True)
+    password = serializers.CharField(write_only=True, min_length=6)
+    companyIds = serializers.ListField(
+        child=serializers.UUIDField(),
+        allow_empty=False,
+    )
+
+    def validate_companyIds(self, value):
+        companies = Company.objects.filter(id__in=value)
+        if companies.count() != len(set(value)):
+            raise ValidationError('One or more companyIds are invalid')
+        return value
+
+    def save(self, **kwargs):
+        name = self.validated_data['name']
+        email = self.validated_data['email'].lower()
+        phone = self.validated_data.get('phone', '')
+        password = self.validated_data['password']
+        company_ids = self.validated_data['companyIds']
+
+        user = User.objects.filter(email=email).first()
+
+        if user:
+            if not user.check_password(password):
+                raise ValidationError({'password': 'Invalid password for existing user'})
+            if user.role != User.Role.CLIENT:
+                raise ValidationError({'email': 'This email is already used by a non-client account'})
+            user.name = user.name or name
+            if phone:
+                user.phone = phone
+            user.save(update_fields=['name', 'phone'])
+        else:
+            user = User.objects.create_user(
+                email=email,
+                password=password,
+                name=name,
+                phone=phone,
+                role=User.Role.CLIENT,
+                status=User.Status.ACTIVE,
+            )
+
+        companies = list(Company.objects.filter(id__in=company_ids))
+        for company in companies:
+            CompanyMembership.objects.get_or_create(user=user, company=company)
+
+        if not user.company_id and companies:
+            user.company = companies[0]
+            user.save(update_fields=['company'])
+
+        return user
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
     companyId = serializers.UUIDField(required=False, allow_null=True)
-    registeredDate = serializers.DateField(source='registered_date', required=False)
+    registeredDate = CoerceDateField(source='registered_date', required=False)
 
     class Meta:
         model = User
@@ -73,14 +155,13 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
 
 class PropertySerializer(serializers.ModelSerializer):
-    companyId = serializers.UUIDField(write_only=True, required=False)
+    companyId = serializers.UUIDField(source='company_id', required=False, allow_null=True)
     imageUrl = serializers.URLField(source='image_url', required=False, allow_blank=True)
 
     class Meta:
         model = Property
         fields = (
             'id',
-            'company',
             'companyId',
             'title',
             'description',
@@ -92,21 +173,18 @@ class PropertySerializer(serializers.ModelSerializer):
             'imageUrl',
             'features',
         )
-        extra_kwargs = {
-            'company': {'read_only': True},
-        }
 
     def create(self, validated_data):
-        company_id = validated_data.pop('companyId', None)
+        company_id = validated_data.pop('company_id', None)
         if company_id:
             validated_data['company'] = Company.objects.get(id=company_id)
         return super().create(validated_data)
 
 
 class ApplicationSerializer(serializers.ModelSerializer):
-    companyId = serializers.UUIDField(write_only=True, required=False)
-    propertyId = serializers.UUIDField(write_only=True, required=False)
-    userId = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+    companyId = serializers.UUIDField(source='company_id', required=False, allow_null=True)
+    propertyId = serializers.UUIDField(source='property_id', required=False, allow_null=True)
+    userId = serializers.UUIDField(source='user_id', required=False, allow_null=True)
     applicantName = serializers.CharField(source='applicant_name')
     applicantEmail = serializers.EmailField(source='applicant_email')
     applicantPhone = serializers.CharField(source='applicant_phone', required=False, allow_blank=True)
@@ -114,17 +192,20 @@ class ApplicationSerializer(serializers.ModelSerializer):
     offerAmount = serializers.DecimalField(source='offer_amount', max_digits=14, decimal_places=2)
     financingMethod = serializers.CharField(source='financing_method', required=False, allow_blank=True)
     intendedUse = serializers.CharField(source='intended_use', required=False, allow_blank=True)
-    dateApplied = serializers.DateField(source='date_applied', required=False)
+    dateApplied = serializers.SerializerMethodField()
+
+    def get_dateApplied(self, obj):
+        value = getattr(obj, 'date_applied', None)
+        if isinstance(value, datetime.datetime):
+            return value.date()
+        return value
 
     class Meta:
         model = Application
         fields = (
             'id',
-            'company',
             'companyId',
-            'property',
             'propertyId',
-            'user',
             'userId',
             'applicantName',
             'applicantEmail',

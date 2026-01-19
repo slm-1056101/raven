@@ -3,29 +3,55 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app
 import { Button } from '@/app/components/ui/button';
 import { Badge } from '@/app/components/ui/badge';
 import { useApp } from '@/app/context/AppContext';
-import { Company } from '@/data/mockData';
 import { toast } from 'sonner';
 
+import { apiFetch } from '@/app/api';
+import type { Company } from '@/app/types';
+
 export function CompanySelection() {
-  const { companies, setCurrentCompany, setCurrentView, currentUser } = useApp();
+  const { companies, setCurrentCompany, setCurrentView, currentUser, authToken, setCurrentUser, refreshAll, hydrateFromApi } = useApp();
 
   const scopedCompanies = companies.filter((c) => {
     if (!currentUser) return false;
     if (currentUser.role === 'SuperAdmin') return true;
-    return c.id === currentUser.companyId;
+    const ids = (currentUser.companyIds && currentUser.companyIds.length > 0) ? currentUser.companyIds : (currentUser.companyId ? [currentUser.companyId] : []);
+    return ids.includes(c.id);
   });
 
   const activeCompanies = scopedCompanies.filter((c) => c.status === 'Active');
   const pendingCompanies = scopedCompanies.filter((c) => c.status === 'Pending');
 
-  const handleSelectCompany = (company: Company) => {
+  const handleSelectCompany = async (company: Company) => {
     if (!currentUser) {
       toast.error('Please login to continue');
       setCurrentView('login');
       return;
     }
 
-    setCurrentCompany(company);
+    if (!authToken) {
+      toast.error('Missing auth token');
+      setCurrentView('login');
+      return;
+    }
+
+    try {
+      const updatedUser = await apiFetch('/api/auth/active-company/', {
+        token: authToken,
+        method: 'POST',
+        body: JSON.stringify({ companyId: company.id }),
+      });
+      setCurrentUser(updatedUser as any);
+
+      const data = await refreshAll(authToken);
+      hydrateFromApi(data);
+
+      const activeCompany = data.companies.find((c) => c.id === company.id) ?? company;
+      setCurrentCompany(activeCompany);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to switch company');
+      return;
+    }
+
 
     if (currentUser.role === 'SuperAdmin') {
       setCurrentView('super-admin');

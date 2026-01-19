@@ -1,6 +1,7 @@
 import { AppProvider, useApp } from '@/app/context/AppContext';
 import { LandingPage } from '@/app/components/LandingPage';
 import { Login } from '@/app/components/Login';
+import { Signup } from '@/app/components/Signup';
 import { CompanySelection } from '@/app/components/CompanySelection';
 import { ClientPortal } from '@/app/components/ClientPortal';
 import { AdminDashboard } from '@/app/components/AdminDashboard';
@@ -18,6 +19,7 @@ function AppContent() {
     <>
       {currentView === 'landing' && <LandingPage />}
       {currentView === 'login' && <Login />}
+      {currentView === 'signup' && <Signup />}
       {currentView === 'company-selection' && <CompanySelection />}
       {currentView === 'client' && <ClientPortal />}
       {currentView === 'admin' && <AdminDashboard />}

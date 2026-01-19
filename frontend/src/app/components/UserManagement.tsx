@@ -10,12 +10,13 @@ import { Avatar, AvatarFallback } from '@/app/components/ui/avatar';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
 import { useApp } from '@/app/context/AppContext';
-import { User } from '@/data/mockData';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
+import type { User } from '@/app/types';
+
 export function UserManagement() {
-  const { getCompanyUsers, updateUser } = useApp();
+  const { getCompanyUsers, updateUser, authToken } = useApp();
   const users = getCompanyUsers();
   const [searchQuery, setSearchQuery] = useState('');
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -43,16 +44,36 @@ export function UserManagement() {
 
   const handleSave = () => {
     if (editingUser) {
-      updateUser(editingUser.id, formData);
-      toast.success('User updated successfully');
-      setShowEditDialog(false);
+      if (!authToken) {
+        toast.error('Missing auth token');
+        return;
+      }
+      (async () => {
+        try {
+          await updateUser(authToken, editingUser.id, formData);
+          toast.success('User updated successfully');
+          setShowEditDialog(false);
+        } catch (err: any) {
+          toast.error(err?.message || 'Failed to update user');
+        }
+      })();
     }
   };
 
   const handleToggleStatus = (user: User) => {
     const newStatus = user.status === 'Active' ? 'Inactive' : 'Active';
-    updateUser(user.id, { status: newStatus });
-    toast.success(`User ${newStatus === 'Active' ? 'activated' : 'deactivated'} successfully`);
+    if (!authToken) {
+      toast.error('Missing auth token');
+      return;
+    }
+    (async () => {
+      try {
+        await updateUser(authToken, user.id, { status: newStatus });
+        toast.success(`User ${newStatus === 'Active' ? 'activated' : 'deactivated'} successfully`);
+      } catch (err: any) {
+        toast.error(err?.message || 'Failed to update user');
+      }
+    })();
   };
 
   const getInitials = (name: string) => {

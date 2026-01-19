@@ -7,27 +7,13 @@ import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { toast } from 'sonner';
 
+import { apiFetch } from '@/app/api';
+import type { User } from '@/app/types';
+
 export function Login() {
-  const { companies, setCurrentUser, setCurrentCompany, setCurrentView, setAuthToken, hydrateFromApi, resetDemoData } = useApp();
+  const { setCurrentUser, setCurrentCompany, setCurrentView, setAuthToken, hydrateFromApi, refreshAll } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-
-  const DEMO_PASSWORD = 'raven123';
-
-  const testAccounts = [
-    { label: 'SuperAdmin', name: 'System Administrator', email: 'superadmin@raven.com' },
-    { label: 'Admin (Delka)', name: 'Delka Admin', email: 'admin@delka.test' },
-    { label: 'Client (Delka)', name: 'Delka Client', email: 'client@delka.test' },
-  ];
-
-  const apiFetch = async (path: string, init?: RequestInit) => {
-    const res = await fetch(path, init);
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(text || `Request failed: ${res.status}`);
-    }
-    return res.json();
-  };
 
   const handleLogin = async () => {
     const normalizedEmail = email.trim().toLowerCase();
@@ -42,42 +28,18 @@ export function Login() {
     }
 
     try {
-      const token = await apiFetch('/api/auth/token/', {
+      const token = await apiFetch<{ access: string; refresh: string }>('/api/auth/token/', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: normalizedEmail, password }),
       });
 
       setAuthToken(token.access);
 
-      const me = await apiFetch('/api/auth/me/', {
-        headers: { Authorization: `Bearer ${token.access}` },
-      });
+      const me = await apiFetch<User>('/api/auth/me/', { token: token.access });
+      const data = await refreshAll(token.access);
 
-      const headers = { Authorization: `Bearer ${token.access}` };
-
-      const [companiesResp, propertiesResp, applicationsResp] = await Promise.all([
-        apiFetch('/api/companies/', { headers }),
-        apiFetch('/api/properties/', { headers }),
-        apiFetch('/api/applications/', { headers }),
-      ]);
-
-      const next: any = {
-        companies: companiesResp,
-        properties: propertiesResp,
-        applications: applicationsResp,
-      };
-
-      if (me.role === 'Admin' || me.role === 'SuperAdmin') {
-        try {
-          next.users = await apiFetch('/api/users/', { headers });
-        } catch {
-          // ignore
-        }
-      }
-
-      hydrateFromApi(next);
-      setCurrentUser(me);
+      hydrateFromApi(data);
+      setCurrentUser(me as any);
 
       if (me.role === 'SuperAdmin') {
         setCurrentCompany(null);
@@ -85,11 +47,17 @@ export function Login() {
         return;
       }
 
-      const company = me.companyId ? (companiesResp.find((c: any) => c.id === me.companyId) ?? null) : null;
+      const company = (me as any).companyId ? (data.companies.find((c: any) => c.id === (me as any).companyId) ?? null) : null;
       setCurrentCompany(company);
 
       if (me.role === 'Admin') {
         setCurrentView('admin');
+        return;
+      }
+
+      const ids = (me.companyIds && me.companyIds.length > 0) ? me.companyIds : (me.companyId ? [me.companyId] : []);
+      if (ids.length > 1) {
+        setCurrentView('company-selection');
         return;
       }
 
@@ -149,44 +117,14 @@ export function Login() {
                 Sign in
               </Button>
 
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={async () => {
-                  await resetDemoData();
-                  toast.success('Demo accounts reloaded');
-                  setEmail('');
-                  setPassword('');
-                }}
-              >
-                Reload demo accounts
+              <Button variant="outline" className="w-full" onClick={() => setCurrentView('signup')}>
+                Create client account
               </Button>
 
               <Button variant="outline" className="w-full" onClick={() => setCurrentView('landing')}>
                 Back
               </Button>
 
-              <div className="pt-4 border-t space-y-2">
-                <div className="text-sm font-medium">Test Accounts</div>
-                <div className="text-xs text-gray-600">Password for all: {DEMO_PASSWORD}</div>
-                <div className="space-y-2">
-                  {testAccounts.map((acc) => (
-                    <button
-                      key={acc.email}
-                      type="button"
-                      className="w-full text-left rounded-lg border px-3 py-2 hover:bg-gray-50 transition-colors"
-                      onClick={() => {
-                        setEmail(acc.email);
-                        setPassword(DEMO_PASSWORD);
-                      }}
-                    >
-                      <div className="text-sm font-medium">{acc.label}</div>
-                      <div className="text-xs text-gray-600">{acc.name}</div>
-                      <div className="text-xs text-gray-600">{acc.email}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
             </CardContent>
           </Card>
         </div>

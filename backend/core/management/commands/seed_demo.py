@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from core.models import Company, User
+from core.models import Company, CompanyMembership, User
 
 
 class Command(BaseCommand):
@@ -45,6 +45,7 @@ class Command(BaseCommand):
         admin_user.company = delka
         admin_user.set_password(demo_password)
         admin_user.save(update_fields=['company', 'password'])
+        CompanyMembership.objects.get_or_create(user=admin_user, company=delka)
 
         client_user, _ = User.objects.get_or_create(
             email='client@delka.test',
@@ -58,6 +59,7 @@ class Command(BaseCommand):
         client_user.company = delka
         client_user.set_password(demo_password)
         client_user.save(update_fields=['company', 'password'])
+        CompanyMembership.objects.get_or_create(user=client_user, company=delka)
 
         self.stdout.write(self.style.SUCCESS('Seeded demo data.'))
         self.stdout.write(self.style.SUCCESS(f'Demo password: {demo_password}'))

@@ -7,12 +7,13 @@ import { Badge } from '@/app/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
 import { useApp } from '@/app/context/AppContext';
-import { Application } from '@/data/mockData';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
+import type { Application } from '@/app/types';
+
 export function ApplicationReview() {
-  const { getCompanyApplications, getCompanyProperties, updateApplication } = useApp();
+  const { getCompanyApplications, getCompanyProperties, updateApplication, authToken } = useApp();
   const applications = getCompanyApplications();
   const properties = getCompanyProperties();
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
@@ -68,19 +69,39 @@ export function ApplicationReview() {
 
   const handleApprove = () => {
     if (selectedApplication) {
-      updateApplication(selectedApplication.id, { status: 'Approved' });
-      toast.success('Application approved successfully');
-      setShowReviewDialog(false);
-      setSelectedApplication(null);
+      if (!authToken) {
+        toast.error('Missing auth token');
+        return;
+      }
+      (async () => {
+        try {
+          await updateApplication(authToken, selectedApplication.id, { status: 'Approved' });
+          toast.success('Application approved successfully');
+          setShowReviewDialog(false);
+          setSelectedApplication(null);
+        } catch (err: any) {
+          toast.error(err?.message || 'Failed to approve application');
+        }
+      })();
     }
   };
 
   const handleReject = () => {
     if (selectedApplication) {
-      updateApplication(selectedApplication.id, { status: 'Rejected' });
-      toast.success('Application rejected');
-      setShowReviewDialog(false);
-      setSelectedApplication(null);
+      if (!authToken) {
+        toast.error('Missing auth token');
+        return;
+      }
+      (async () => {
+        try {
+          await updateApplication(authToken, selectedApplication.id, { status: 'Rejected' });
+          toast.success('Application rejected');
+          setShowReviewDialog(false);
+          setSelectedApplication(null);
+        } catch (err: any) {
+          toast.error(err?.message || 'Failed to reject application');
+        }
+      })();
     }
   };
 

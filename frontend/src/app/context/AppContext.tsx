@@ -1,35 +1,37 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { properties as initialProperties, applications as initialApplications, users as initialUsers, companies as initialCompanies, Property, Application, User, Company } from '@/data/mockData';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+
+import { apiFetch } from '@/app/api';
+import type { Application, Company, Property, User } from '@/app/types';
 
 interface AppContextType {
   properties: Property[];
   applications: Application[];
   users: User[];
   companies: Company[];
-  currentView: 'landing' | 'login' | 'company-selection' | 'client' | 'admin' | 'super-admin';
+  currentView: 'landing' | 'login' | 'signup' | 'company-selection' | 'client' | 'admin' | 'super-admin';
   currentCompany: Company | null;
   currentUser: User | null;
   authToken: string | null;
-  setCurrentView: (view: 'landing' | 'login' | 'company-selection' | 'client' | 'admin' | 'super-admin') => void;
+  setCurrentView: (view: 'landing' | 'login' | 'signup' | 'company-selection' | 'client' | 'admin' | 'super-admin') => void;
   setCurrentCompany: (company: Company | null) => void;
   setCurrentUser: (user: User | null) => void;
   setAuthToken: (token: string | null) => void;
+  refreshAll: (token: string) => Promise<{ companies: Company[]; properties: Property[]; applications: Application[]; users?: User[] }>;
   hydrateFromApi: (data: {
     companies?: Company[];
     users?: User[];
     properties?: Property[];
     applications?: Application[];
   }) => void;
-  resetDemoData: () => Promise<void>;
-  addProperty: (property: Property) => void;
-  updateProperty: (id: string, property: Partial<Property>) => void;
-  deleteProperty: (id: string) => void;
-  addApplication: (application: Application) => void;
-  updateApplication: (id: string, application: Partial<Application>) => void;
-  updateUser: (id: string, user: Partial<User>) => void;
-  addCompany: (company: Company) => void;
-  updateCompany: (id: string, company: Partial<Company>) => void;
-  deleteCompany: (id: string) => void;
+  createProperty: (token: string, property: Partial<Property>) => Promise<Property>;
+  updateProperty: (token: string, id: string, property: Partial<Property>) => Promise<Property>;
+  deleteProperty: (token: string, id: string) => Promise<void>;
+  createApplication: (token: string, application: Partial<Application>) => Promise<Application>;
+  updateApplication: (token: string, id: string, application: Partial<Application>) => Promise<Application>;
+  updateUser: (token: string, id: string, user: Partial<User>) => Promise<User>;
+  createCompany: (token: string, company: Partial<Company>) => Promise<Company>;
+  updateCompany: (token: string, id: string, company: Partial<Company>) => Promise<Company>;
+  deleteCompany: (token: string, id: string) => Promise<void>;
   // Filtered data by current company
   getCompanyProperties: () => Property[];
   getCompanyApplications: () => Application[];
@@ -39,11 +41,11 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [properties, setProperties] = useState<Property[]>(initialProperties);
-  const [applications, setApplications] = useState<Application[]>(initialApplications);
-  const [users, setUsers] = useState<User[]>(initialUsers);
-  const [companies, setCompanies] = useState<Company[]>(initialCompanies);
-  const [currentView, setCurrentView] = useState<'landing' | 'login' | 'company-selection' | 'client' | 'admin' | 'super-admin'>('landing');
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [currentView, setCurrentView] = useState<'landing' | 'login' | 'signup' | 'company-selection' | 'client' | 'admin' | 'super-admin'>('landing');
   const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(() => {
@@ -67,6 +69,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  useEffect(() => {
+    if (!authToken) return;
+    if (currentUser) return;
+
+    (async () => {
+      try {
+        const me = await apiFetch<User>('/api/auth/me/', { token: authToken });
+        const data = await refreshAll(authToken);
+        hydrateFromApi(data);
+
+        setCurrentUser(me);
+
+        const activeCompany = me.companyId ? (data.companies.find((c) => c.id === me.companyId) ?? null) : null;
+        setCurrentCompany(activeCompany);
+
+        if (me.role === 'SuperAdmin') {
+          setCurrentView('super-admin');
+        } else if (me.role === 'Admin') {
+          setCurrentView('admin');
+        } else if (me.role === 'Client') {
+          const ids = (me.companyIds && me.companyIds.length > 0) ? me.companyIds : (me.companyId ? [me.companyId] : []);
+          if (ids.length > 1) {
+            setCurrentView('company-selection');
+          } else {
+            setCurrentView('client');
+          }
+        } else {
+          setCurrentView('login');
+        }
+      } catch {
+        setCurrentCompany(null);
+        setCurrentUser(null);
+        setAuthTokenAndPersist(null);
+        setCurrentView('login');
+      }
+    })();
+  }, [authToken, currentUser]);
+
   const hydrateFromApi = (data: {
     companies?: Company[];
     users?: User[];
@@ -79,60 +119,129 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (data.applications) setApplications(data.applications);
   };
 
-  const resetDemoData = async () => {
-    const data = await import('@/data/mockData');
-    setProperties(data.properties);
-    setApplications(data.applications);
-    setUsers(data.users);
-    setCompanies(data.companies);
-    setCurrentCompany(null);
-    setCurrentUser(null);
-    setAuthTokenAndPersist(null);
-    setCurrentView('login');
+  const refreshAll = async (token: string) => {
+    const headers = { token };
+
+    const [companiesResp, propertiesResp, applicationsResp] = await Promise.all([
+      apiFetch<Company[]>('/api/companies/', headers),
+      apiFetch<Property[]>('/api/properties/', headers),
+      apiFetch<Application[]>('/api/applications/', headers),
+    ]);
+
+    const normalizedProperties = (propertiesResp as any[]).map((p) => ({
+      ...p,
+      companyId: (p.companyId ?? p.company ?? null) as string,
+      price: typeof p.price === 'string' ? Number(p.price) : p.price,
+      size: typeof p.size === 'string' ? Number(p.size) : p.size,
+    })) as Property[];
+
+    const normalizedApplications = (applicationsResp as any[]).map((a) => ({
+      ...a,
+      companyId: (a.companyId ?? a.company ?? null) as string,
+      propertyId: (a.propertyId ?? a.property ?? null) as string,
+      userId: (a.userId ?? a.user ?? null) as string | null,
+      offerAmount: typeof a.offerAmount === 'string' ? Number(a.offerAmount) : a.offerAmount,
+    })) as Application[];
+
+    let usersResp: User[] | undefined;
+    try {
+      usersResp = await apiFetch<User[]>('/api/users/', headers);
+    } catch {
+      usersResp = undefined;
+    }
+
+    return {
+      companies: companiesResp,
+      properties: normalizedProperties,
+      applications: normalizedApplications,
+      users: usersResp,
+    };
   };
 
-  const addProperty = (property: Property) => {
-    setProperties(prev => [...prev, property]);
+  const createProperty = async (token: string, property: Partial<Property>) => {
+    const created = await apiFetch<Property>('/api/properties/', {
+      token,
+      method: 'POST',
+      body: JSON.stringify(property),
+    });
+    setProperties((prev) => [created, ...prev]);
+    return created;
   };
 
-  const updateProperty = (id: string, updatedProperty: Partial<Property>) => {
-    setProperties(prev => 
-      prev.map(prop => prop.id === id ? { ...prop, ...updatedProperty } : prop)
-    );
+  const updatePropertyApi = async (token: string, id: string, property: Partial<Property>) => {
+    const updated = await apiFetch<Property>(`/api/properties/${id}/`, {
+      token,
+      method: 'PATCH',
+      body: JSON.stringify(property),
+    });
+    setProperties((prev) => prev.map((p) => (p.id === id ? updated : p)));
+    return updated;
   };
 
-  const deleteProperty = (id: string) => {
-    setProperties(prev => prev.filter(prop => prop.id !== id));
+  const deletePropertyApi = async (token: string, id: string) => {
+    await apiFetch<void>(`/api/properties/${id}/`, {
+      token,
+      method: 'DELETE',
+    });
+    setProperties((prev) => prev.filter((p) => p.id !== id));
   };
 
-  const addApplication = (application: Application) => {
-    setApplications(prev => [...prev, application]);
+  const createApplication = async (token: string, application: Partial<Application>) => {
+    const created = await apiFetch<Application>('/api/applications/', {
+      token,
+      method: 'POST',
+      body: JSON.stringify(application),
+    });
+    setApplications((prev) => [created, ...prev]);
+    return created;
   };
 
-  const updateApplication = (id: string, updatedApplication: Partial<Application>) => {
-    setApplications(prev =>
-      prev.map(app => app.id === id ? { ...app, ...updatedApplication } : app)
-    );
+  const updateApplicationApi = async (token: string, id: string, application: Partial<Application>) => {
+    const updated = await apiFetch<Application>(`/api/applications/${id}/`, {
+      token,
+      method: 'PATCH',
+      body: JSON.stringify(application),
+    });
+    setApplications((prev) => prev.map((a) => (a.id === id ? updated : a)));
+    return updated;
   };
 
-  const updateUser = (id: string, updatedUser: Partial<User>) => {
-    setUsers(prev =>
-      prev.map(user => user.id === id ? { ...user, ...updatedUser } : user)
-    );
+  const updateUserApi = async (token: string, id: string, user: Partial<User>) => {
+    const updated = await apiFetch<User>(`/api/users/${id}/`, {
+      token,
+      method: 'PATCH',
+      body: JSON.stringify(user),
+    });
+    setUsers((prev) => prev.map((u) => (u.id === id ? updated : u)));
+    return updated;
   };
 
-  const addCompany = (company: Company) => {
-    setCompanies(prev => [...prev, company]);
+  const createCompany = async (token: string, company: Partial<Company>) => {
+    const created = await apiFetch<Company>('/api/companies/', {
+      token,
+      method: 'POST',
+      body: JSON.stringify(company),
+    });
+    setCompanies((prev) => [created, ...prev]);
+    return created;
   };
 
-  const updateCompany = (id: string, updatedCompany: Partial<Company>) => {
-    setCompanies(prev =>
-      prev.map(company => company.id === id ? { ...company, ...updatedCompany } : company)
-    );
+  const updateCompanyApi = async (token: string, id: string, company: Partial<Company>) => {
+    const updated = await apiFetch<Company>(`/api/companies/${id}/`, {
+      token,
+      method: 'PATCH',
+      body: JSON.stringify(company),
+    });
+    setCompanies((prev) => prev.map((c) => (c.id === id ? updated : c)));
+    return updated;
   };
 
-  const deleteCompany = (id: string) => {
-    setCompanies(prev => prev.filter(company => company.id !== id));
+  const deleteCompanyApi = async (token: string, id: string) => {
+    await apiFetch<void>(`/api/companies/${id}/`, {
+      token,
+      method: 'DELETE',
+    });
+    setCompanies((prev) => prev.filter((c) => c.id !== id));
   };
 
   // Filter data by current company
@@ -166,17 +275,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setCurrentCompany,
         setCurrentUser,
         setAuthToken: setAuthTokenAndPersist,
+        refreshAll,
         hydrateFromApi,
-        resetDemoData,
-        addProperty,
-        updateProperty,
-        deleteProperty,
-        addApplication,
-        updateApplication,
-        updateUser,
-        addCompany,
-        updateCompany,
-        deleteCompany,
+        createProperty,
+        updateProperty: updatePropertyApi,
+        deleteProperty: deletePropertyApi,
+        createApplication,
+        updateApplication: updateApplicationApi,
+        updateUser: updateUserApi,
+        createCompany,
+        updateCompany: updateCompanyApi,
+        deleteCompany: deleteCompanyApi,
         getCompanyProperties,
         getCompanyApplications,
         getCompanyUsers,
