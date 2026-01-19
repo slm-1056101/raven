@@ -8,25 +8,28 @@ import { Label } from '@/app/components/ui/label';
 import { toast } from 'sonner';
 
 export function Login() {
-  const { users, companies, setCurrentUser, setCurrentCompany, setCurrentView, resetDemoData } = useApp();
+  const { companies, setCurrentUser, setCurrentCompany, setCurrentView, setAuthToken, hydrateFromApi, resetDemoData } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const DEMO_PASSWORD = 'raven123';
 
-  const testAccounts = users
-    .filter((u) => u.status === 'Active')
-    .map((u) => {
-      const companyName = u.companyId ? companies.find((c) => c.id === u.companyId)?.name ?? 'Unknown company' : null;
-      const label = companyName ? `${u.role} - ${companyName}` : u.role;
-      return {
-        label,
-        email: u.email,
-        name: u.name,
-      };
-    });
+  const testAccounts = [
+    { label: 'SuperAdmin', name: 'System Administrator', email: 'superadmin@raven.com' },
+    { label: 'Admin (Delka)', name: 'Delka Admin', email: 'admin@delka.test' },
+    { label: 'Client (Delka)', name: 'Delka Client', email: 'client@delka.test' },
+  ];
 
-  const handleLogin = () => {
+  const apiFetch = async (path: string, init?: RequestInit) => {
+    const res = await fetch(path, init);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || `Request failed: ${res.status}`);
+    }
+    return res.json();
+  };
+
+  const handleLogin = async () => {
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail) {
       toast.error('Please enter your email');
@@ -38,39 +41,63 @@ export function Login() {
       return;
     }
 
-    if (password !== DEMO_PASSWORD) {
-      toast.error('Invalid password');
-      return;
+    try {
+      const token = await apiFetch('/api/auth/token/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail, password }),
+      });
+
+      setAuthToken(token.access);
+
+      const me = await apiFetch('/api/auth/me/', {
+        headers: { Authorization: `Bearer ${token.access}` },
+      });
+
+      const headers = { Authorization: `Bearer ${token.access}` };
+
+      const [companiesResp, propertiesResp, applicationsResp] = await Promise.all([
+        apiFetch('/api/companies/', { headers }),
+        apiFetch('/api/properties/', { headers }),
+        apiFetch('/api/applications/', { headers }),
+      ]);
+
+      const next: any = {
+        companies: companiesResp,
+        properties: propertiesResp,
+        applications: applicationsResp,
+      };
+
+      if (me.role === 'Admin' || me.role === 'SuperAdmin') {
+        try {
+          next.users = await apiFetch('/api/users/', { headers });
+        } catch {
+          // ignore
+        }
+      }
+
+      hydrateFromApi(next);
+      setCurrentUser(me);
+
+      if (me.role === 'SuperAdmin') {
+        setCurrentCompany(null);
+        setCurrentView('super-admin');
+        return;
+      }
+
+      const company = me.companyId ? (companiesResp.find((c: any) => c.id === me.companyId) ?? null) : null;
+      setCurrentCompany(company);
+
+      if (me.role === 'Admin') {
+        setCurrentView('admin');
+        return;
+      }
+
+      setCurrentView('client');
+    } catch (err: any) {
+      toast.error(err?.message || 'Login failed');
+      setAuthToken(null);
     }
-
-    const user = users.find((u) => u.email.toLowerCase() === normalizedEmail);
-    if (!user) {
-      toast.error('No user found for this email');
-      return;
-    }
-
-    if (user.status !== 'Active') {
-      toast.error('This account is inactive');
-      return;
-    }
-
-    setCurrentUser(user);
-
-    if (user.role === 'SuperAdmin') {
-      setCurrentCompany(null);
-      setCurrentView('super-admin');
-      return;
-    }
-
-    const company = user.companyId ? companies.find((c) => c.id === user.companyId) ?? null : null;
-    setCurrentCompany(company);
-
-    if (user.role === 'Admin') {
-      setCurrentView('admin');
-      return;
-    }
-
-    setCurrentView('client');
   };
 
   return (

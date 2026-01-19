@@ -1,41 +1,70 @@
 # Backend
 
-This folder contains the backend services for the Raven project.
+This folder contains the Django backend for the Raven project.
 
 Quick start
 -----------
 
-- Install dependencies:
+Run everything (Postgres + Django API) via Docker Compose from the repository root.
 
-  npm install
+1) Start the stack:
 
-- Run the development server:
+  docker compose up -d --build
 
-  npm run dev
+2) Seed demo data:
 
-or
+  docker compose exec backend python manage.py seed_demo
 
-  npm start
+The backend will be available at:
+
+  http://localhost:8000/
 
 Environment
 -----------
 
-- Copy `.env.example` to `.env` and update values as needed.
+Docker Compose uses sensible defaults, but you can override values with environment variables:
+
+- POSTGRES_DB (default: raven)
+- POSTGRES_USER (default: raven)
+- POSTGRES_PASSWORD (default: raven)
+- DJANGO_DEBUG (default: 1)
+- DJANGO_SECRET_KEY
+- DJANGO_ALLOWED_HOSTS (default: localhost,127.0.0.1)
+- CORS_ALLOWED_ORIGINS (default: http://localhost:5173)
 
 Notes
 -----
 
-- See the repository root README.md for overall project information.
+- This backend uses JWT authentication (SimpleJWT).
+- If you change Python dependencies in `backend/requirements.txt`, rebuild:
 
-Laravel setup
--------------
+  docker compose up -d --build
 
-This repository can host a Laravel backend in this folder. A convenience script is provided to install PHP/Composer and create a Laravel project here.
+Swagger / OpenAPI
+-----------------
 
-Run from the repository root:
+- OpenAPI schema:
 
-  ./backend/setup.sh
+  http://localhost:8000/api/schema/
 
-The script checks for Homebrew, installs PHP and Composer if missing, and runs `composer create-project laravel/laravel .` to create the project. If you prefer to install tools manually, follow the Composer and PHP installation guides for macOS.
+- Swagger UI:
 
-After creation, run `php artisan serve` or configure your web server and `.env` file as usual.
+  http://localhost:8000/api/docs/
+
+In Swagger UI, click "Authorize" and paste a JWT access token (format: `Bearer <token>`).
+
+To get a token:
+
+  POST http://localhost:8000/api/auth/token/
+  {"email":"admin@delka.test","password":"raven123"}
+
+Demo credentials
+----------------
+
+Password for all demo users: `raven123`
+
+- superadmin@raven.com
+- admin@delka.test
+- client@delka.test
+
+

@@ -9,9 +9,17 @@ interface AppContextType {
   currentView: 'landing' | 'login' | 'company-selection' | 'client' | 'admin' | 'super-admin';
   currentCompany: Company | null;
   currentUser: User | null;
+  authToken: string | null;
   setCurrentView: (view: 'landing' | 'login' | 'company-selection' | 'client' | 'admin' | 'super-admin') => void;
   setCurrentCompany: (company: Company | null) => void;
   setCurrentUser: (user: User | null) => void;
+  setAuthToken: (token: string | null) => void;
+  hydrateFromApi: (data: {
+    companies?: Company[];
+    users?: User[];
+    properties?: Property[];
+    applications?: Application[];
+  }) => void;
   resetDemoData: () => Promise<void>;
   addProperty: (property: Property) => void;
   updateProperty: (id: string, property: Partial<Property>) => void;
@@ -38,6 +46,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [currentView, setCurrentView] = useState<'landing' | 'login' | 'company-selection' | 'client' | 'admin' | 'super-admin'>('landing');
   const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('raven_auth_token');
+    } catch {
+      return null;
+    }
+  });
+
+  const setAuthTokenAndPersist = (token: string | null) => {
+    setAuthToken(token);
+    try {
+      if (token) {
+        localStorage.setItem('raven_auth_token', token);
+      } else {
+        localStorage.removeItem('raven_auth_token');
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const hydrateFromApi = (data: {
+    companies?: Company[];
+    users?: User[];
+    properties?: Property[];
+    applications?: Application[];
+  }) => {
+    if (data.companies) setCompanies(data.companies);
+    if (data.users) setUsers(data.users);
+    if (data.properties) setProperties(data.properties);
+    if (data.applications) setApplications(data.applications);
+  };
 
   const resetDemoData = async () => {
     const data = await import('@/data/mockData');
@@ -47,6 +87,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setCompanies(data.companies);
     setCurrentCompany(null);
     setCurrentUser(null);
+    setAuthTokenAndPersist(null);
     setCurrentView('login');
   };
 
@@ -120,9 +161,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         currentView,
         currentCompany,
         currentUser,
+        authToken,
         setCurrentView,
         setCurrentCompany,
         setCurrentUser,
+        setAuthToken: setAuthTokenAndPersist,
+        hydrateFromApi,
         resetDemoData,
         addProperty,
         updateProperty,
