@@ -307,7 +307,7 @@ export function LandAcquisitionForm({ property, onClose }: LandAcquisitionFormPr
                       <div className="grid grid-cols-3 gap-4 text-sm">
                         <div className="flex items-center gap-1">
                           <DollarSign className="h-4 w-4 text-gray-500" />
-                          <span>${property.price}K</span>
+                          <span>D{property.price}K</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Square className="h-4 w-4 text-gray-500" />
@@ -359,7 +359,7 @@ export function LandAcquisitionForm({ property, onClose }: LandAcquisitionFormPr
                   placeholder="850000"
                 />
                 <p className="text-sm text-gray-600">
-                  Listed price: ${(property.price * 1000).toLocaleString()}
+                  Listed price: D{(property.price * 1000).toLocaleString()}
                 </p>
                 {errors.offerAmount && (
                   <p className="text-sm text-red-500">{errors.offerAmount.message}</p>

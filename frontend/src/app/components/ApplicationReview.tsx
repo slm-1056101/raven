@@ -260,7 +260,7 @@ export function ApplicationReview() {
                             <p className="font-medium">{property?.title || 'Unknown'}</p>
                           </TableCell>
                           <TableCell className="font-medium">
-                            ${application.offerAmount.toLocaleString()}
+                            D{application.offerAmount.toLocaleString()}
                           </TableCell>
                           <TableCell>
                             {format(new Date(application.dateApplied), 'MMM dd, yyyy')}
@@ -375,7 +375,7 @@ export function ApplicationReview() {
                         <div className="grid grid-cols-3 gap-4">
                           <div>
                             <p className="text-sm text-gray-600">Listed Price</p>
-                            <p className="font-medium">${property.price}K</p>
+                            <p className="font-medium">D{property.price}K</p>
                           </div>
                           <div>
                             <p className="text-sm text-gray-600">Size</p>
@@ -406,7 +406,7 @@ export function ApplicationReview() {
                   <div>
                     <p className="text-sm text-gray-600">Offer Amount</p>
                     <p className="text-3xl font-bold text-blue-600">
-                      ${selectedApplication.offerAmount.toLocaleString()}
+                      D{selectedApplication.offerAmount.toLocaleString()}
                     </p>
                     {(() => {
                       const property = getPropertyDetails(selectedApplication.propertyId);
@@ -415,7 +415,7 @@ export function ApplicationReview() {
                         const difference = selectedApplication.offerAmount - listedPrice;
                         return (
                           <p className="text-sm text-gray-600 mt-1">
-                            {difference >= 0 ? '+' : ''}{difference.toLocaleString()} from listed price
+                            {difference >= 0 ? '+' : ''}D{difference.toLocaleString()} from listed price
                           </p>
                         );
                       }

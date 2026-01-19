@@ -251,7 +251,7 @@ export function PropertyInventory() {
                     </div>
                   </TableCell>
                   <TableCell className="font-medium">
-                    ${property.price.toLocaleString()}K
+                    D{property.price.toLocaleString()}K
                   </TableCell>
                   <TableCell>
                     <Badge className={`${getStatusColor(property.status)} text-white`}>

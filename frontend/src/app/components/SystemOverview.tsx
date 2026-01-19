@@ -146,7 +146,7 @@ export function SystemOverview() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Revenue</p>
-                <p className="text-3xl font-bold mt-2">${(totalRevenue / 1000000).toFixed(1)}M</p>
+                <p className="text-3xl font-bold mt-2">D{(totalRevenue / 1000000).toFixed(1)}M</p>
                 <p className="text-sm text-green-600 mt-1">+{approvedApplications} approved</p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
@@ -242,7 +242,7 @@ export function SystemOverview() {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="type" />
               <YAxis />
-              <Tooltip formatter={(value) => `$${value}K`} />
+              <Tooltip formatter={(value) => `D${value}K`} />
               <Bar dataKey="revenue" fill="#10b981" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -278,7 +278,7 @@ export function SystemOverview() {
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="font-medium">${(application.offerAmount / 1000).toFixed(0)}K</p>
+                  <p className="font-medium">D{(application.offerAmount / 1000).toFixed(0)}K</p>
                 </div>
               </div>
             ))}

@@ -194,7 +194,7 @@ export function MyApplications() {
                       </div>
                     </TableCell>
                     <TableCell className="font-medium">
-                      ${application.offerAmount.toLocaleString()}
+                      D{application.offerAmount.toLocaleString()}
                     </TableCell>
                     <TableCell>
                       {format(new Date(application.dateApplied), 'MMM dd, yyyy')}
@@ -264,7 +264,7 @@ export function MyApplications() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Offer Amount</p>
-                  <p className="font-medium">${selectedApplication.offerAmount.toLocaleString()}</p>
+                  <p className="font-medium">D{selectedApplication.offerAmount.toLocaleString()}</p>
                 </div>
               </div>
 

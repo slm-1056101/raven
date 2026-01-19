@@ -18,6 +18,14 @@ export function PropertyMarketplace() {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [showApplicationForm, setShowApplicationForm] = useState(false);
 
+  const locationOptions = Array.from(
+    new Set(
+      properties
+        .map((p) => (p.location ?? '').trim())
+        .filter((v) => v.length > 0),
+    ),
+  ).sort((a, b) => a.localeCompare(b));
+
   const handleApplyNow = (property: Property) => {
     setSelectedProperty(property);
     setShowApplicationForm(true);
@@ -31,8 +39,7 @@ export function PropertyMarketplace() {
   const filteredProperties = properties.filter((property) => {
     // Location filter
     if (locationFilter !== 'all') {
-      const state = property.location.split(', ')[1];
-      if (state !== locationFilter) return false;
+      if (property.location !== locationFilter) return false;
     }
 
     // Size filter
@@ -117,14 +124,11 @@ export function PropertyMarketplace() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Locations</SelectItem>
-                  <SelectItem value="FL">Florida</SelectItem>
-                  <SelectItem value="TX">Texas</SelectItem>
-                  <SelectItem value="WA">Washington</SelectItem>
-                  <SelectItem value="CO">Colorado</SelectItem>
-                  <SelectItem value="OR">Oregon</SelectItem>
-                  <SelectItem value="CA">California</SelectItem>
-                  <SelectItem value="SC">South Carolina</SelectItem>
-                  <SelectItem value="AZ">Arizona</SelectItem>
+                  {locationOptions.map((loc) => (
+                    <SelectItem key={loc} value={loc}>
+                      {loc}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -154,9 +158,9 @@ export function PropertyMarketplace() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Prices</SelectItem>
-                  <SelectItem value="under400">Under $400K</SelectItem>
-                  <SelectItem value="400-800">$400K - $800K</SelectItem>
-                  <SelectItem value="over800">$800K+</SelectItem>
+                  <SelectItem value="under400">Under D400K</SelectItem>
+                  <SelectItem value="400-800">D400K - D800K</SelectItem>
+                  <SelectItem value="over800">D800K+</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -239,7 +243,7 @@ export function PropertyMarketplace() {
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <DollarSign className="h-4 w-4 text-gray-500" />
-                  <span>${property.price}K</span>
+                  <span>D{property.price}K</span>
                 </div>
               </div>
 
