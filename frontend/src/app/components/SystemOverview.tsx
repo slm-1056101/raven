@@ -1,7 +1,7 @@
 import { Building2, Clock, DollarSign, Users, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { useApp } from '@/app/context/AppContext';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
 
 export function SystemOverview() {
@@ -18,15 +18,25 @@ export function SystemOverview() {
     .filter(a => a.status === 'Approved')
     .reduce((sum, app) => sum + app.offerAmount, 0);
 
-  // Application trends data (monthly)
-  const applicationTrends = [
-    { month: 'Aug', applications: 12 },
-    { month: 'Sep', applications: 18 },
-    { month: 'Oct', applications: 15 },
-    { month: 'Nov', applications: 22 },
-    { month: 'Dec', applications: 28 },
-    { month: 'Jan', applications: applications.length },
-  ];
+  // Application trends data (monthly) - last 6 months
+  const now = new Date();
+  const monthBuckets = Array.from({ length: 6 }).map((_, idx) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (5 - idx), 1);
+    return {
+      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+      month: format(d, 'MMM'),
+      year: d.getFullYear(),
+      applications: 0,
+    };
+  });
+
+  const applicationTrends = monthBuckets.map((b) => {
+    const count = applications.filter((a) => {
+      const dt = new Date(a.dateApplied);
+      return dt.getFullYear() === b.year && dt.getMonth() + 1 === Number(b.key.split('-')[1]);
+    }).length;
+    return { month: b.month, applications: count };
+  });
 
   // Property status distribution
   const propertyStatusData = [
@@ -204,7 +214,7 @@ export function SystemOverview() {
                 <Tooltip />
                 <Bar dataKey="count" radius={[8, 8, 0, 0]}>
                   {propertyStatusData.map((entry, index) => (
-                    <Bar
+                    <Cell
                       key={`cell-${index}`}
                       fill={
                         entry.status === 'Available' ? '#2563eb' :

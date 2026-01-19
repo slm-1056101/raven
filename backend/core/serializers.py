@@ -156,7 +156,23 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
 class PropertySerializer(serializers.ModelSerializer):
     companyId = serializers.UUIDField(source='company_id', required=False, allow_null=True)
-    imageUrl = serializers.URLField(source='image_url', required=False, allow_blank=True)
+    plotNumber = serializers.CharField(source='plot_number', required=False, allow_blank=True, allow_null=True)
+    roomNumber = serializers.CharField(source='room_number', required=False, allow_blank=True, allow_null=True)
+    image = serializers.ImageField(required=False, allow_null=True, write_only=True)
+    imageUrl = serializers.SerializerMethodField()
+
+    def get_imageUrl(self, obj):
+        image = getattr(obj, 'image', None)
+        if not image:
+            return ''
+        try:
+            url = image.url
+        except Exception:
+            return ''
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(url)
+        return url
 
     class Meta:
         model = Property
@@ -166,10 +182,13 @@ class PropertySerializer(serializers.ModelSerializer):
             'title',
             'description',
             'location',
+            'plotNumber',
+            'roomNumber',
             'price',
             'size',
             'status',
             'type',
+            'image',
             'imageUrl',
             'features',
         )

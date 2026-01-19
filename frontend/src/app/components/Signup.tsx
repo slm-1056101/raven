@@ -7,7 +7,7 @@ import { Label } from '@/app/components/ui/label';
 import { toast } from 'sonner';
 import { useApp } from '@/app/context/AppContext';
 import { apiFetch } from '@/app/api';
-import type { Company } from '@/app/types';
+import type { Company, User } from '@/app/types';
 
 export function Signup() {
   const { setCurrentView, setAuthToken, setCurrentUser, hydrateFromApi, refreshAll } = useApp();
@@ -68,9 +68,9 @@ export function Signup() {
       });
 
       setAuthToken(resp.access);
-      setCurrentUser(resp.user);
 
-      const data = await refreshAll(resp.access);
+      const me = await apiFetch<User>('/api/auth/me/', { token: resp.access });
+      const data = await refreshAll(resp.access, { includeUsers: me.role !== 'Client' });
       hydrateFromApi(data);
 
       setCurrentView('company-selection');

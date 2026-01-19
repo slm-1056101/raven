@@ -3,6 +3,8 @@ export interface Property {
   title: string;
   description: string;
   location: string;
+  plotNumber?: string | null;
+  roomNumber?: string | null;
   price: number;
   size: number;
   status: 'Available' | 'Reserved' | 'Sold';

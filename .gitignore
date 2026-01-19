@@ -54,6 +54,9 @@ ENV/
 /frontend/dist/
 /backend/dist/
 
+# Django media uploads
+/backend/media/
+
 # Laravel backend
 /backend/vendor/
 /backend/.env

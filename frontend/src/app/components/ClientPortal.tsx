@@ -7,7 +7,7 @@ import { MyApplications } from '@/app/components/MyApplications';
 import { useApp } from '@/app/context/AppContext';
 
 export function ClientPortal() {
-  const { setCurrentView, currentCompany, currentUser } = useApp();
+  const { logout, setCurrentView, currentCompany, currentUser } = useApp();
   const [activeTab, setActiveTab] = useState('marketplace');
 
   return (
@@ -30,6 +30,9 @@ export function ClientPortal() {
                   <p className="text-gray-600">{currentUser.email}</p>
                 </div>
               )}
+              <Button variant="outline" onClick={logout}>
+                Logout
+              </Button>
               <Button 
                 variant="outline"
                 onClick={() => setCurrentView('company-selection')}

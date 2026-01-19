@@ -36,7 +36,7 @@ export function Login() {
       setAuthToken(token.access);
 
       const me = await apiFetch<User>('/api/auth/me/', { token: token.access });
-      const data = await refreshAll(token.access);
+      const data = await refreshAll(token.access, { includeUsers: me.role !== 'Client' });
 
       hydrateFromApi(data);
       setCurrentUser(me as any);

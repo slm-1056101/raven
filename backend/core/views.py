@@ -1,5 +1,6 @@
 from django.db.models import QuerySet
 from rest_framework import viewsets
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -196,8 +197,8 @@ class CompanyViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
     list=extend_schema(summary='List users', description='Admin/SuperAdmin: list users within the current tenant scope.'),
     retrieve=extend_schema(summary='Get user', description='Admin/SuperAdmin: retrieve a single user.'),
     create=extend_schema(summary='Create user', description='SuperAdmin-only: create a user.'),
-    update=extend_schema(summary='Update user', description='SuperAdmin-only: update a user.'),
-    partial_update=extend_schema(summary='Partially update user', description='SuperAdmin-only: partially update a user.'),
+    update=extend_schema(summary='Update user', description='Admin/SuperAdmin: update a user within the current tenant scope.'),
+    partial_update=extend_schema(summary='Partially update user', description='Admin/SuperAdmin: partially update a user within the current tenant scope (e.g. deactivate).'),
     destroy=extend_schema(summary='Delete user', description='SuperAdmin-only: delete a user.'),
 )
 class UserViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
@@ -215,7 +216,7 @@ class UserViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         return UserSerializer
 
     def get_permissions(self):
-        if self.action in ('list', 'retrieve'):
+        if self.action in ('list', 'retrieve', 'update', 'partial_update'):
             return [IsAdminOrSuperAdmin()]
         return [IsSuperAdmin()]
 
@@ -230,6 +231,7 @@ class UserViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
 )
 class PropertyViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
     serializer_class = PropertySerializer
+    parser_classes = (JSONParser, MultiPartParser, FormParser)
 
     def get_queryset(self) -> QuerySet:
         tenant_company_id = self._tenant_company_id()
@@ -248,9 +250,9 @@ class PropertyViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
             serializer.save()
             return
         if getattr(user, 'role', None) == 'Client':
-            serializer.save(companyId=user.company_id)
+            serializer.save(company_id=user.company_id)
             return
-        serializer.save(companyId=user.company_id)
+        serializer.save(company_id=user.company_id)
 
 
 @extend_schema_view(

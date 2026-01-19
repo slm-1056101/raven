@@ -1,13 +1,20 @@
+import { useMemo, useState } from 'react';
 import { FileText, Clock, CheckCircle, XCircle, Download } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/app/components/ui/table';
 import { Badge } from '@/app/components/ui/badge';
 import { Button } from '@/app/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
 import { useApp } from '@/app/context/AppContext';
 import { format } from 'date-fns';
 
+import type { Application } from '@/app/types';
+
 export function MyApplications() {
   const { getCompanyApplications, getCompanyProperties, currentUser } = useApp();
+  const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
+  const [showDialog, setShowDialog] = useState(false);
+
   const applications = getCompanyApplications().filter((a) => {
     if (!currentUser) return false;
     if (a.userId && a.userId === currentUser.id) return true;
@@ -15,6 +22,11 @@ export function MyApplications() {
     return false;
   });
   const properties = getCompanyProperties();
+
+  const selectedProperty = useMemo(() => {
+    if (!selectedApplication) return null;
+    return properties.find((p) => p.id === selectedApplication.propertyId) ?? null;
+  }, [properties, selectedApplication]);
 
   const getPropertyTitle = (propertyId: string) => {
     const property = properties.find(p => p.id === propertyId);
@@ -51,6 +63,42 @@ export function MyApplications() {
     total: applications.length,
     pending: applications.filter(a => a.status === 'Pending').length,
     approved: applications.filter(a => a.status === 'Approved').length,
+  };
+
+  const downloadText = (filename: string, contents: string) => {
+    const blob = new Blob([contents], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleView = (application: Application) => {
+    setSelectedApplication(application);
+    setShowDialog(true);
+  };
+
+  const handleDownloadContract = (application: Application) => {
+    downloadText(
+      `contract-${application.id}.txt`,
+      JSON.stringify(
+        {
+          applicationId: application.id,
+          propertyId: application.propertyId,
+          status: application.status,
+          offerAmount: application.offerAmount,
+          applicantName: application.applicantName,
+          applicantEmail: application.applicantEmail,
+          dateApplied: application.dateApplied,
+        },
+        null,
+        2,
+      ),
+    );
   };
 
   return (
@@ -165,11 +213,16 @@ export function MyApplications() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => handleView(application)}>
                           View
                         </Button>
                         {application.status === 'Approved' && (
-                          <Button variant="outline" size="sm" className="gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1"
+                            onClick={() => handleDownloadContract(application)}
+                          >
                             <Download className="h-3 w-3" />
                             Contract
                           </Button>
@@ -183,6 +236,97 @@ export function MyApplications() {
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Application Details</DialogTitle>
+            <DialogDescription>View your submitted application information</DialogDescription>
+          </DialogHeader>
+
+          {selectedApplication && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-600">Application ID</p>
+                  <p className="font-mono text-sm">{selectedApplication.id}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Status</p>
+                  <Badge className={`${getStatusColor(selectedApplication.status)} flex items-center gap-1 w-fit`}>
+                    {getStatusIcon(selectedApplication.status)}
+                    {selectedApplication.status}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Date Applied</p>
+                  <p className="font-medium">{format(new Date(selectedApplication.dateApplied), 'MMM dd, yyyy')}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Offer Amount</p>
+                  <p className="font-medium">${selectedApplication.offerAmount.toLocaleString()}</p>
+                </div>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Property</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {selectedProperty ? (
+                    <div>
+                      <p className="font-medium">{selectedProperty.title}</p>
+                      <p className="text-sm text-gray-600">{selectedProperty.location}</p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">Unknown Property</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Applicant</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div>
+                    <p className="text-sm text-gray-600">Name</p>
+                    <p className="font-medium">{selectedApplication.applicantName}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Email</p>
+                    <p className="font-medium">{selectedApplication.applicantEmail}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Phone</p>
+                    <p className="font-medium">{selectedApplication.applicantPhone}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Address</p>
+                    <p className="font-medium">{selectedApplication.applicantAddress}</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Offer</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div>
+                    <p className="text-sm text-gray-600">Financing Method</p>
+                    <p className="font-medium">{selectedApplication.financingMethod}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Intended Use</p>
+                    <p className="font-medium">{selectedApplication.intendedUse}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -8,7 +8,7 @@ export async function apiFetch<T>(
   if (token) {
     nextHeaders.set('Authorization', `Bearer ${token}`);
   }
-  if (!nextHeaders.has('Content-Type') && rest.body) {
+  if (!nextHeaders.has('Content-Type') && rest.body && !(rest.body instanceof FormData)) {
     nextHeaders.set('Content-Type', 'application/json');
   }
 

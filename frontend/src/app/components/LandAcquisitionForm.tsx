@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useEffect, useState, type ChangeEvent } from 'react';
+import { Controller, useForm } from 'react-hook-form';
 import { User, FileText, DollarSign, Upload, CheckCircle2, AlertCircle, MapPin, Square, Building2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
@@ -37,11 +37,23 @@ export function LandAcquisitionForm({ property, onClose }: LandAcquisitionFormPr
   const [idDocumentFile, setIdDocumentFile] = useState<File | null>(null);
   const [proofOfFundsFile, setProofOfFundsFile] = useState<File | null>(null);
   
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, trigger, control, setValue, formState: { errors } } = useForm<FormData>({
+    shouldUnregister: true,
     defaultValues: {
+      fullName: '',
+      email: '',
+      phone: '',
+      address: '',
       propertyId: property.id,
     }
   });
+
+  useEffect(() => {
+    if (!currentUser) return;
+    if (currentUser.name) setValue('fullName', currentUser.name, { shouldDirty: false });
+    if (currentUser.email) setValue('email', currentUser.email, { shouldDirty: false });
+    if ((currentUser as any).phone) setValue('phone', (currentUser as any).phone, { shouldDirty: false });
+  }, [currentUser, setValue]);
 
   const steps = [
     { number: 1, title: 'Personal Info', icon: User },
@@ -61,11 +73,6 @@ export function LandAcquisitionForm({ property, onClose }: LandAcquisitionFormPr
   };
 
   const onSubmit = (data: FormData) => {
-    if (currentStep !== 4) {
-      nextStep();
-      return;
-    }
-
     if (!authToken) {
       toast.error('Missing auth token');
       return;
@@ -73,6 +80,16 @@ export function LandAcquisitionForm({ property, onClose }: LandAcquisitionFormPr
     const companyId = currentCompany?.id || property.companyId;
     if (!companyId) {
       toast.error('Missing company');
+      return;
+    }
+
+    if (!idDocumentFile) {
+      toast.error('ID Document is required');
+      return;
+    }
+
+    if (!proofOfFundsFile) {
+      toast.error('Proof of Funds is required');
       return;
     }
 
@@ -103,7 +120,44 @@ export function LandAcquisitionForm({ property, onClose }: LandAcquisitionFormPr
     })();
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'id' | 'funds') => {
+  const validateAndNext = async () => {
+    let fields: (keyof FormData)[] = [];
+    if (currentStep === 1) fields = ['fullName', 'email', 'phone', 'address'];
+    if (currentStep === 2) fields = ['intendedUse'];
+    if (currentStep === 3) fields = ['offerAmount', 'financingMethod'];
+
+    // Browser autofill may not trigger onChange. Sync visible input values into RHF before validating.
+    if (currentStep === 1) {
+      const fullNameEl = document.getElementById('fullName') as HTMLInputElement | null;
+      const emailEl = document.getElementById('email') as HTMLInputElement | null;
+      const phoneEl = document.getElementById('phone') as HTMLInputElement | null;
+      const addressEl = document.getElementById('address') as HTMLInputElement | null;
+
+      if (fullNameEl?.value) setValue('fullName', fullNameEl.value, { shouldDirty: true });
+      if (emailEl?.value) setValue('email', emailEl.value, { shouldDirty: true });
+      if (phoneEl?.value) setValue('phone', phoneEl.value, { shouldDirty: true });
+      if (addressEl?.value) setValue('address', addressEl.value, { shouldDirty: true });
+    }
+
+    if (currentStep === 2) {
+      const intendedUseEl = document.getElementById('intendedUse') as HTMLTextAreaElement | null;
+      if (intendedUseEl?.value) setValue('intendedUse', intendedUseEl.value, { shouldDirty: true });
+    }
+
+    if (currentStep === 3) {
+      const offerAmountEl = document.getElementById('offerAmount') as HTMLInputElement | null;
+      if (offerAmountEl?.value) {
+        const n = Number(offerAmountEl.value);
+        if (!Number.isNaN(n)) setValue('offerAmount', n as any, { shouldDirty: true });
+      }
+    }
+
+    const ok = await trigger(fields as any, { shouldFocus: true });
+    if (!ok) return;
+    nextStep();
+  };
+
+  const handleFileUpload = (e: ChangeEvent<HTMLInputElement>, type: 'id' | 'funds') => {
     const file = e.target.files?.[0];
     if (file) {
       if (type === 'id') {
@@ -314,17 +368,27 @@ export function LandAcquisitionForm({ property, onClose }: LandAcquisitionFormPr
 
               <div className="space-y-2">
                 <Label htmlFor="financingMethod">Financing Method *</Label>
-                <Select {...register('financingMethod', { required: true })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select financing method" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Cash Payment">Cash Payment</SelectItem>
-                    <SelectItem value="Mortgage/Loan">Mortgage/Loan</SelectItem>
-                    <SelectItem value="Mixed (Cash + Loan)">Mixed (Cash + Loan)</SelectItem>
-                    <SelectItem value="Installment Plan">Installment Plan</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Controller
+                  control={control}
+                  name="financingMethod"
+                  rules={{ required: 'Financing method is required' }}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select financing method" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Cash Payment">Cash Payment</SelectItem>
+                        <SelectItem value="Mortgage/Loan">Mortgage/Loan</SelectItem>
+                        <SelectItem value="Mixed (Cash + Loan)">Mixed (Cash + Loan)</SelectItem>
+                        <SelectItem value="Installment Plan">Installment Plan</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.financingMethod && (
+                  <p className="text-sm text-red-500">{errors.financingMethod.message}</p>
+                )}
               </div>
 
               <Card className="bg-yellow-50 border-yellow-200">
@@ -449,8 +513,9 @@ export function LandAcquisitionForm({ property, onClose }: LandAcquisitionFormPr
             {currentStep === 1 ? 'Cancel' : 'Previous'}
           </Button>
           <Button
-            type="submit"
+            type={currentStep === 4 ? 'submit' : 'button'}
             className={currentStep === 4 ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}
+            onClick={currentStep === 4 ? undefined : validateAndNext}
           >
             {currentStep === 4 ? 'Submit Application' : 'Next Step'}
           </Button>

@@ -27,6 +27,44 @@ export function ApplicationReview() {
     rejected: applications.filter(a => a.status === 'Rejected').length,
   };
 
+  const downloadText = (filename: string, contents: string) => {
+    const blob = new Blob([contents], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadDocument = (application: Application, kind: 'idDocument' | 'proofOfFunds') => {
+    const raw = (application as any)?.documents?.[kind] as string | null | undefined;
+    if (!raw) {
+      toast.error('No document available');
+      return;
+    }
+
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+      window.open(raw, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    downloadText(
+      `${kind}-${application.id}.txt`,
+      JSON.stringify(
+        {
+          applicationId: application.id,
+          documentType: kind,
+          documentName: raw,
+        },
+        null,
+        2,
+      ),
+    );
+  };
+
   const getPropertyDetails = (propertyId: string) => {
     return properties.find(p => p.id === propertyId);
   };
@@ -411,7 +449,12 @@ export function ApplicationReview() {
                       <p className="font-medium">ID Document</p>
                       <p className="text-sm text-gray-600">{selectedApplication.documents.idDocument}</p>
                     </div>
-                    <Button variant="outline" size="sm" className="gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1"
+                      onClick={() => handleDownloadDocument(selectedApplication, 'idDocument')}
+                    >
                       <Download className="h-4 w-4" />
                       Download
                     </Button>
@@ -421,7 +464,12 @@ export function ApplicationReview() {
                       <p className="font-medium">Proof of Funds</p>
                       <p className="text-sm text-gray-600">{selectedApplication.documents.proofOfFunds}</p>
                     </div>
-                    <Button variant="outline" size="sm" className="gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1"
+                      onClick={() => handleDownloadDocument(selectedApplication, 'proofOfFunds')}
+                    >
                       <Download className="h-4 w-4" />
                       Download
                     </Button>

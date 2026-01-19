@@ -23,6 +23,7 @@ export function PropertyInventory() {
   const [deletingPropertyId, setDeletingPropertyId] = useState<string | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [formData, setFormData] = useState<Partial<Property>>({});
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   const filteredProperties = properties.filter((property) =>
     property.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -40,20 +41,23 @@ export function PropertyInventory() {
   const handleEdit = (property: Property) => {
     setEditingProperty(property);
     setFormData(property);
+    setImageFile(null);
     setShowEditDialog(true);
   };
 
   const handleAddNew = () => {
     setEditingProperty(null);
+    setImageFile(null);
     setFormData({
       title: '',
       description: '',
       location: '',
+      plotNumber: '',
+      roomNumber: '',
       price: 0,
       size: 0,
       status: 'Available',
       type: 'Residential',
-      imageUrl: '',
       features: [],
     });
     setShowEditDialog(true);
@@ -71,14 +75,36 @@ export function PropertyInventory() {
 
     (async () => {
       try {
+        const buildFormData = (extra?: { companyId?: string }) => {
+          const fd = new FormData();
+          if (extra?.companyId) fd.append('companyId', extra.companyId);
+
+          if (formData.title != null) fd.append('title', String(formData.title));
+          if (formData.description != null) fd.append('description', String(formData.description));
+          if (formData.location != null) fd.append('location', String(formData.location));
+          if (formData.plotNumber != null) fd.append('plotNumber', String(formData.plotNumber));
+          if (formData.roomNumber != null) fd.append('roomNumber', String(formData.roomNumber));
+          if (formData.price != null) fd.append('price', String(formData.price));
+          if (formData.size != null) fd.append('size', String(formData.size));
+          if (formData.status != null) fd.append('status', String(formData.status));
+          if (formData.type != null) fd.append('type', String(formData.type));
+
+          if (imageFile) fd.append('image', imageFile);
+          return fd;
+        };
+
         if (editingProperty) {
-          await updateProperty(authToken, editingProperty.id, formData);
+          const payload = imageFile ? (buildFormData() as any) : formData;
+          await updateProperty(authToken, editingProperty.id, payload);
           toast.success('Property updated successfully');
         } else {
-          await createProperty(authToken, {
-            ...formData,
-            companyId: currentCompany.id,
-          });
+          const payload = imageFile
+            ? (buildFormData({ companyId: currentCompany.id }) as any)
+            : {
+                ...formData,
+                companyId: currentCompany.id,
+              };
+          await createProperty(authToken, payload);
           toast.success('Property added successfully');
         }
         setShowEditDialog(false);
@@ -307,6 +333,28 @@ export function PropertyInventory() {
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="plotNumber">Plot Number</Label>
+                <Input
+                  id="plotNumber"
+                  value={formData.plotNumber || ''}
+                  onChange={(e) => setFormData({ ...formData, plotNumber: e.target.value })}
+                  placeholder="Optional"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="roomNumber">Room Number</Label>
+                <Input
+                  id="roomNumber"
+                  value={formData.roomNumber || ''}
+                  onChange={(e) => setFormData({ ...formData, roomNumber: e.target.value })}
+                  placeholder="Optional"
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
               <Textarea
@@ -360,12 +408,12 @@ export function PropertyInventory() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="imageUrl">Image URL</Label>
+              <Label htmlFor="image">Upload Image</Label>
               <Input
-                id="imageUrl"
-                value={formData.imageUrl || ''}
-                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                placeholder="https://..."
+                id="image"
+                type="file"
+                accept="image/*"
+                onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
               />
             </div>
           </div>

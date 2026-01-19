@@ -21,18 +21,7 @@ function statusBadgeVariant(status: string) {
 }
 
 export function SuperAdminDashboard() {
-  const {
-    companies,
-    users,
-    authToken,
-    createCompany,
-    setCurrentView,
-    setCurrentCompany,
-    setCurrentUser,
-    updateCompany,
-    deleteCompany,
-    updateUser,
-  } = useApp();
+  const { companies, users, createCompany, updateCompany, deleteCompany, updateUser, authToken, setCurrentView, logout } = useApp();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'companies' | 'users'>('overview');
   const [showNewCompanyDialog, setShowNewCompanyDialog] = useState(false);
@@ -149,9 +138,7 @@ export function SuperAdminDashboard() {
   }, [companies, users]);
 
   const handleLogout = () => {
-    setCurrentUser(null);
-    setCurrentCompany(null);
-    setCurrentView('landing');
+    logout();
   };
 
   return (

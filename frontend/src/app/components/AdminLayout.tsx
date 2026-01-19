@@ -11,7 +11,7 @@ interface AdminLayoutProps {
 }
 
 export function AdminLayout({ children, activeTab, onTabChange }: AdminLayoutProps) {
-  const { setCurrentView, currentCompany, currentUser } = useApp();
+  const { logout, currentCompany, currentUser } = useApp();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const menuItems = [
@@ -96,15 +96,15 @@ export function AdminLayout({ children, activeTab, onTabChange }: AdminLayoutPro
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate">Admin User</p>
-                  <p className="text-xs text-gray-600 truncate">admin@landproperty.com</p>
+                  <p className="font-medium text-sm truncate">{currentUser?.name || 'Admin User'}</p>
+                  <p className="text-xs text-gray-600 truncate">{currentUser?.email || ''}</p>
                 </div>
               </div>
               <Button
                 variant="outline"
                 size="sm"
                 className="w-full gap-2"
-                onClick={() => setCurrentView('landing')}
+                onClick={logout}
               >
                 <LogOut className="h-4 w-4" />
                 Logout

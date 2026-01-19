@@ -16,13 +16,17 @@ interface AppContextType {
   setCurrentCompany: (company: Company | null) => void;
   setCurrentUser: (user: User | null) => void;
   setAuthToken: (token: string | null) => void;
-  refreshAll: (token: string) => Promise<{ companies: Company[]; properties: Property[]; applications: Application[]; users?: User[] }>;
+  refreshAll: (
+    token: string,
+    options?: { includeUsers?: boolean },
+  ) => Promise<{ companies: Company[]; properties: Property[]; applications: Application[]; users?: User[] }>;
   hydrateFromApi: (data: {
     companies?: Company[];
     users?: User[];
     properties?: Property[];
     applications?: Application[];
   }) => void;
+  logout: () => void;
   createProperty: (token: string, property: Partial<Property>) => Promise<Property>;
   updateProperty: (token: string, id: string, property: Partial<Property>) => Promise<Property>;
   deleteProperty: (token: string, id: string) => Promise<void>;
@@ -76,7 +80,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         const me = await apiFetch<User>('/api/auth/me/', { token: authToken });
-        const data = await refreshAll(authToken);
+        const data = await refreshAll(authToken, { includeUsers: me.role !== 'Client' });
         hydrateFromApi(data);
 
         setCurrentUser(me);
@@ -119,8 +123,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (data.applications) setApplications(data.applications);
   };
 
-  const refreshAll = async (token: string) => {
+  const refreshAll = async (token: string, options?: { includeUsers?: boolean }) => {
     const headers = { token };
+    const includeUsers = options?.includeUsers !== false;
 
     const [companiesResp, propertiesResp, applicationsResp] = await Promise.all([
       apiFetch<Company[]>('/api/companies/', headers),
@@ -144,10 +149,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })) as Application[];
 
     let usersResp: User[] | undefined;
-    try {
-      usersResp = await apiFetch<User[]>('/api/users/', headers);
-    } catch {
-      usersResp = undefined;
+    if (includeUsers) {
+      try {
+        usersResp = await apiFetch<User[]>('/api/users/', headers);
+      } catch {
+        usersResp = undefined;
+      }
     }
 
     return {
@@ -158,11 +165,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   };
 
+  const logout = () => {
+    setAuthTokenAndPersist(null);
+    setCurrentUser(null);
+    setCurrentCompany(null);
+    setCompanies([]);
+    setUsers([]);
+    setProperties([]);
+    setApplications([]);
+    setCurrentView('login');
+  };
+
+  const isFormData = (value: any): value is FormData => {
+    return typeof FormData !== 'undefined' && value instanceof FormData;
+  };
+
   const createProperty = async (token: string, property: Partial<Property>) => {
     const created = await apiFetch<Property>('/api/properties/', {
       token,
       method: 'POST',
-      body: JSON.stringify(property),
+      body: isFormData(property) ? (property as any) : JSON.stringify(property),
     });
     setProperties((prev) => [created, ...prev]);
     return created;
@@ -172,7 +194,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const updated = await apiFetch<Property>(`/api/properties/${id}/`, {
       token,
       method: 'PATCH',
-      body: JSON.stringify(property),
+      body: isFormData(property) ? (property as any) : JSON.stringify(property),
     });
     setProperties((prev) => prev.map((p) => (p.id === id ? updated : p)));
     return updated;
@@ -277,6 +299,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setAuthToken: setAuthTokenAndPersist,
         refreshAll,
         hydrateFromApi,
+        logout,
         createProperty,
         updateProperty: updatePropertyApi,
         deleteProperty: deletePropertyApi,

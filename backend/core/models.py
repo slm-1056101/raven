@@ -124,13 +124,16 @@ class Property(models.Model):
     description = models.TextField(blank=True)
     location = models.CharField(max_length=255)
 
+    plot_number = models.CharField(max_length=64, blank=True, null=True)
+    room_number = models.CharField(max_length=64, blank=True, null=True)
+
     price = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     size = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.AVAILABLE)
     type = models.CharField(max_length=16, choices=Type.choices, default=Type.RESIDENTIAL)
 
-    image_url = models.URLField(blank=True)
+    image = models.ImageField(upload_to='properties/', blank=True, null=True)
     features = models.JSONField(default=list, blank=True)
 
     def __str__(self) -> str:
