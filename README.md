@@ -88,6 +88,29 @@ JWT token endpoints:
 - `POST /api/auth/token/refresh/` (refresh)
 - `GET /api/auth/me/` (current user)
 
+## Demo Seed Data
+
+This repo includes a Django management command to create starter demo data:
+
+- Company: `Delka`
+- SuperAdmin: `superadmin@raven.com`
+- Admin (Delka): `admin@delka.test`
+- Client (Delka): `client@delka.test`
+- Password (all): `raven123`
+
+Run it with Docker Compose:
+
+```bash
+docker compose exec backend python manage.py seed_demo
+```
+
+If your database is brand new, run migrations first:
+
+```bash
+docker compose exec backend python manage.py migrate
+docker compose exec backend python manage.py seed_demo
+```
+
 ## Notes
 
 - If you add or change backend models, run Django migrations.
