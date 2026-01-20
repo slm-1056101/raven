@@ -95,23 +95,22 @@ export function LandAcquisitionForm({ property, onClose }: LandAcquisitionFormPr
 
     (async () => {
       try {
-        await createApplication(authToken, {
-          propertyId: property.id,
-          userId: currentUser?.id ?? null,
-          applicantName: data.fullName,
-          applicantEmail: data.email,
-          applicantPhone: data.phone,
-          applicantAddress: data.address,
-          offerAmount: data.offerAmount,
-          financingMethod: data.financingMethod,
-          intendedUse: data.intendedUse,
-          status: 'Pending',
-          documents: {
-            idDocument: idDocumentFile?.name || null,
-            proofOfFunds: proofOfFundsFile?.name || null,
-          },
-          companyId,
-        } as any);
+        const fd = new FormData();
+        fd.append('companyId', companyId);
+        fd.append('propertyId', property.id);
+        if (currentUser?.id) fd.append('userId', currentUser.id);
+        fd.append('applicantName', data.fullName);
+        fd.append('applicantEmail', data.email);
+        fd.append('applicantPhone', data.phone);
+        fd.append('applicantAddress', data.address);
+        fd.append('offerAmount', String(data.offerAmount));
+        fd.append('financingMethod', data.financingMethod);
+        fd.append('intendedUse', data.intendedUse);
+        fd.append('status', 'Pending');
+        fd.append('idDocument', idDocumentFile);
+        fd.append('proofOfFunds', proofOfFundsFile);
+
+        await createApplication(authToken, fd as any);
         toast.success('Application submitted successfully!');
         onClose();
       } catch (err: any) {

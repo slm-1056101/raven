@@ -20,6 +20,28 @@ export function ApplicationReview() {
   const [showReviewDialog, setShowReviewDialog] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
 
+  const [docPreviewOpen, setDocPreviewOpen] = useState(false);
+  const [docPreviewTitle, setDocPreviewTitle] = useState('');
+  const [docPreviewUrl, setDocPreviewUrl] = useState<string | null>(null);
+  const [docPreviewText, setDocPreviewText] = useState<string | null>(null);
+
+  const isImageUrl = (url: string) => {
+    const clean = url.split('?')[0].toLowerCase();
+    return clean.endsWith('.png') || clean.endsWith('.jpg') || clean.endsWith('.jpeg') || clean.endsWith('.gif') || clean.endsWith('.webp');
+  };
+
+  const isHttpUrl = (value: string) => value.startsWith('http://') || value.startsWith('https://');
+
+  const friendlyNameFromUrl = (url: string) => {
+    try {
+      const path = url.split('?')[0];
+      const last = path.split('/').filter(Boolean).pop() || path;
+      return decodeURIComponent(last);
+    } catch {
+      return url;
+    }
+  };
+
   const stats = {
     total: applications.length,
     pending: applications.filter(a => a.status === 'Pending').length,
@@ -27,32 +49,26 @@ export function ApplicationReview() {
     rejected: applications.filter(a => a.status === 'Rejected').length,
   };
 
-  const downloadText = (filename: string, contents: string) => {
-    const blob = new Blob([contents], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleDownloadDocument = (application: Application, kind: 'idDocument' | 'proofOfFunds') => {
+  const handlePreviewDocument = (application: Application, kind: 'idDocument' | 'proofOfFunds') => {
     const raw = (application as any)?.documents?.[kind] as string | null | undefined;
     if (!raw) {
       toast.error('No document available');
       return;
     }
 
+    setDocPreviewTitle(kind === 'idDocument' ? 'ID Document' : 'Proof of Funds');
+
     if (raw.startsWith('http://') || raw.startsWith('https://')) {
-      window.open(raw, '_blank', 'noopener,noreferrer');
+      setDocPreviewUrl(raw);
+      setDocPreviewText(null);
+      setDocPreviewOpen(true);
       return;
     }
 
-    downloadText(
-      `${kind}-${application.id}.txt`,
+    // If the backend only stored a filename (current behavior), we can't fetch file bytes.
+    // Show a simple preview with the metadata instead of downloading a placeholder file.
+    setDocPreviewUrl(null);
+    setDocPreviewText(
       JSON.stringify(
         {
           applicationId: application.id,
@@ -63,6 +79,7 @@ export function ApplicationReview() {
         2,
       ),
     );
+    setDocPreviewOpen(true);
   };
 
   const getPropertyDetails = (propertyId: string) => {
@@ -447,35 +464,108 @@ export function ApplicationReview() {
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
                     <div>
                       <p className="font-medium">ID Document</p>
-                      <p className="text-sm text-gray-600">{selectedApplication.documents.idDocument}</p>
+                      {(() => {
+                        const raw = selectedApplication.documents.idDocument;
+                        if (!raw) return <p className="text-sm text-gray-600">No document</p>;
+                        if (typeof raw === 'string' && isHttpUrl(raw)) {
+                          return (
+                            <a
+                              href={raw}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-blue-600 underline"
+                            >
+                              {friendlyNameFromUrl(raw)}
+                            </a>
+                          );
+                        }
+                        return <p className="text-sm text-gray-600">{String(raw)}</p>;
+                      })()}
                     </div>
                     <Button
                       variant="outline"
                       size="sm"
                       className="gap-1"
-                      onClick={() => handleDownloadDocument(selectedApplication, 'idDocument')}
+                      onClick={() => handlePreviewDocument(selectedApplication, 'idDocument')}
                     >
-                      <Download className="h-4 w-4" />
-                      Download
+                      <Eye className="h-4 w-4" />
+                      Preview
                     </Button>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
                     <div>
                       <p className="font-medium">Proof of Funds</p>
-                      <p className="text-sm text-gray-600">{selectedApplication.documents.proofOfFunds}</p>
+                      {(() => {
+                        const raw = selectedApplication.documents.proofOfFunds;
+                        if (!raw) return <p className="text-sm text-gray-600">No document</p>;
+                        if (typeof raw === 'string' && isHttpUrl(raw)) {
+                          return (
+                            <a
+                              href={raw}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-blue-600 underline"
+                            >
+                              {friendlyNameFromUrl(raw)}
+                            </a>
+                          );
+                        }
+                        return <p className="text-sm text-gray-600">{String(raw)}</p>;
+                      })()}
                     </div>
                     <Button
                       variant="outline"
                       size="sm"
                       className="gap-1"
-                      onClick={() => handleDownloadDocument(selectedApplication, 'proofOfFunds')}
+                      onClick={() => handlePreviewDocument(selectedApplication, 'proofOfFunds')}
                     >
-                      <Download className="h-4 w-4" />
-                      Download
+                      <Eye className="h-4 w-4" />
+                      Preview
                     </Button>
                   </div>
                 </CardContent>
               </Card>
+
+              <Dialog open={docPreviewOpen} onOpenChange={setDocPreviewOpen}>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>{docPreviewTitle}</DialogTitle>
+                    <DialogDescription>Preview submitted document</DialogDescription>
+                  </DialogHeader>
+
+                  {docPreviewUrl ? (
+                    <div className="space-y-3">
+                      <div className="flex justify-end">
+                        <a
+                          href={docPreviewUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 underline"
+                        >
+                          {friendlyNameFromUrl(docPreviewUrl)}
+                        </a>
+                      </div>
+                      {isImageUrl(docPreviewUrl) ? (
+                        <div className="w-full border rounded overflow-hidden bg-white">
+                          <img
+                            src={docPreviewUrl}
+                            alt={docPreviewTitle}
+                            className="w-full max-h-[70vh] object-contain"
+                          />
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-600">
+                          Preview is available in a new tab.
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <pre className="text-xs bg-gray-50 border rounded p-3 overflow-auto">
+                      {docPreviewText ?? 'No preview available'}
+                    </pre>
+                  )}
+                </DialogContent>
+              </Dialog>
 
               {/* Action Buttons */}
               {selectedApplication.status === 'Pending' && (

@@ -212,7 +212,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const created = await apiFetch<Application>('/api/applications/', {
       token,
       method: 'POST',
-      body: JSON.stringify(application),
+      body: isFormData(application) ? (application as any) : JSON.stringify(application),
     });
     setApplications((prev) => [created, ...prev]);
     return created;

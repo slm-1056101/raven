@@ -165,6 +165,9 @@ class Application(models.Model):
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
     date_applied = models.DateField(default=timezone.now)
 
+    id_document = models.FileField(upload_to='applications/id_documents/', blank=True, null=True)
+    proof_of_funds = models.FileField(upload_to='applications/proof_of_funds/', blank=True, null=True)
+
     documents = models.JSONField(default=dict, blank=True)
 
     def __str__(self) -> str:

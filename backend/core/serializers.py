@@ -212,12 +212,36 @@ class ApplicationSerializer(serializers.ModelSerializer):
     financingMethod = serializers.CharField(source='financing_method', required=False, allow_blank=True)
     intendedUse = serializers.CharField(source='intended_use', required=False, allow_blank=True)
     dateApplied = serializers.SerializerMethodField()
+    idDocument = serializers.FileField(source='id_document', required=False, allow_null=True, write_only=True)
+    proofOfFunds = serializers.FileField(source='proof_of_funds', required=False, allow_null=True, write_only=True)
 
     def get_dateApplied(self, obj):
         value = getattr(obj, 'date_applied', None)
         if isinstance(value, datetime.datetime):
             return value.date()
         return value
+
+    def _file_url(self, file_field):
+        if not file_field:
+            return ''
+        try:
+            url = file_field.url
+        except Exception:
+            return ''
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(url)
+        return url
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        docs = data.get('documents') or {}
+        if not isinstance(docs, dict):
+            docs = {}
+        docs['idDocument'] = self._file_url(getattr(instance, 'id_document', None)) or docs.get('idDocument') or ''
+        docs['proofOfFunds'] = self._file_url(getattr(instance, 'proof_of_funds', None)) or docs.get('proofOfFunds') or ''
+        data['documents'] = docs
+        return data
 
     class Meta:
         model = Application
@@ -235,6 +259,8 @@ class ApplicationSerializer(serializers.ModelSerializer):
             'intendedUse',
             'status',
             'dateApplied',
+            'idDocument',
+            'proofOfFunds',
             'documents',
         )
         extra_kwargs = {
@@ -244,9 +270,20 @@ class ApplicationSerializer(serializers.ModelSerializer):
         }
 
     def create(self, validated_data):
-        company_id = validated_data.pop('companyId', None)
-        property_id = validated_data.pop('propertyId', None)
-        user_id = validated_data.pop('userId', None)
+        company_id = validated_data.pop('company_id', None)
+        property_id = validated_data.pop('property_id', None)
+        user_id = validated_data.pop('user_id', None)
+
+        id_doc = validated_data.get('id_document')
+        pof = validated_data.get('proof_of_funds')
+        if id_doc:
+            validated_data.setdefault('documents', {})
+            if isinstance(validated_data['documents'], dict):
+                validated_data['documents']['idDocumentName'] = getattr(id_doc, 'name', '')
+        if pof:
+            validated_data.setdefault('documents', {})
+            if isinstance(validated_data['documents'], dict):
+                validated_data['documents']['proofOfFundsName'] = getattr(pof, 'name', '')
 
         if company_id:
             validated_data['company'] = Company.objects.get(id=company_id)

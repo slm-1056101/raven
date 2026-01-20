@@ -27,7 +27,11 @@ export interface Application {
   intendedUse: string;
   status: 'Pending' | 'Approved' | 'Rejected';
   dateApplied: string;
-  documents: Record<string, any>;
+  documents: {
+    idDocument?: string;
+    proofOfFunds?: string;
+    [key: string]: any;
+  };
   companyId: string;
 }
 

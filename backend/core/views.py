@@ -265,6 +265,7 @@ class PropertyViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
 )
 class ApplicationViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
     serializer_class = ApplicationSerializer
+    parser_classes = (JSONParser, MultiPartParser, FormParser)
 
     def get_queryset(self) -> QuerySet:
         tenant_company_id = self._tenant_company_id()
@@ -283,9 +284,9 @@ class ApplicationViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
             serializer.save()
             return
         if getattr(user, 'role', None) == 'Client':
-            serializer.save(companyId=user.company_id, user=user)
+            serializer.save(company_id=user.company_id, user=user)
             return
-        serializer.save(companyId=user.company_id)
+        serializer.save(company_id=user.company_id)
 
 
 class HealthView(APIView):
