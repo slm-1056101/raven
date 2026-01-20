@@ -14,6 +14,7 @@ from .permissions import IsAdminOrSuperAdmin, IsAuthenticatedUser, IsSuperAdmin
 from .serializers import (
     ApplicationSerializer,
     ClientSignupSerializer,
+    CompanyCreateSerializer,
     CompanySerializer,
     PropertySerializer,
     UserCreateSerializer,
@@ -171,6 +172,11 @@ class TenantScopedViewSetMixin:
 class CompanyViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
     queryset = Company.objects.all().order_by('name')
     serializer_class = CompanySerializer
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return CompanyCreateSerializer
+        return CompanySerializer
 
     def get_queryset(self) -> QuerySet:
         user = self.request.user

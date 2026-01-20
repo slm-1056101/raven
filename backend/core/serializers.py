@@ -2,6 +2,7 @@ import datetime
 
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from django.db import transaction
 
 from .models import Application, Company, CompanyMembership, Property, User
 
@@ -39,6 +40,46 @@ class CompanySerializer(serializers.ModelSerializer):
             'contactPhone',
             'address',
         )
+
+
+class CompanyCreateSerializer(CompanySerializer):
+    adminName = serializers.CharField(write_only=True, max_length=255)
+    adminEmail = serializers.EmailField(write_only=True)
+    adminPassword = serializers.CharField(write_only=True, min_length=6)
+
+    class Meta(CompanySerializer.Meta):
+        fields = CompanySerializer.Meta.fields + (
+            'adminName',
+            'adminEmail',
+            'adminPassword',
+        )
+
+    def validate_adminEmail(self, value):
+        email = value.lower()
+        if User.objects.filter(email=email).exists():
+            raise ValidationError('A user with this email already exists')
+        return email
+
+    @transaction.atomic
+    def create(self, validated_data):
+        admin_name = validated_data.pop('adminName')
+        admin_email = validated_data.pop('adminEmail').lower()
+        admin_password = validated_data.pop('adminPassword')
+
+        company = super().create(validated_data)
+
+        admin_user = User.objects.create_user(
+            email=admin_email,
+            password=admin_password,
+            name=admin_name,
+            phone='',
+            role=User.Role.ADMIN,
+            status=User.Status.ACTIVE,
+            company=company,
+            is_staff=True,
+        )
+        CompanyMembership.objects.get_or_create(user=admin_user, company=company)
+        return company
 
 
 class UserSerializer(serializers.ModelSerializer):

@@ -31,6 +31,9 @@ export function SuperAdminDashboard() {
     contactEmail: '',
     contactPhone: '',
     address: '',
+    adminName: '',
+    adminEmail: '',
+    adminPassword: '',
   });
 
   const [showEditCompanyDialog, setShowEditCompanyDialog] = useState(false);
@@ -41,6 +44,15 @@ export function SuperAdminDashboard() {
     contactEmail: '',
     contactPhone: '',
     address: '',
+  });
+
+  const [showEditUserDialog, setShowEditUserDialog] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editUserFormData, setEditUserFormData] = useState({
+    name: '',
+    phone: '',
+    role: 'Client',
+    status: 'Active',
   });
 
   const handleRegisterCompany = () => {
@@ -60,6 +72,9 @@ export function SuperAdminDashboard() {
           contactEmail: companyFormData.contactEmail,
           contactPhone: companyFormData.contactPhone,
           address: companyFormData.address,
+          adminName: companyFormData.adminName,
+          adminEmail: companyFormData.adminEmail,
+          adminPassword: companyFormData.adminPassword,
         } as any);
         toast.success('Company created');
         setShowNewCompanyDialog(false);
@@ -69,6 +84,9 @@ export function SuperAdminDashboard() {
           contactEmail: '',
           contactPhone: '',
           address: '',
+          adminName: '',
+          adminEmail: '',
+          adminPassword: '',
         });
       } catch (err: any) {
         toast.error(err?.message || 'Failed to create company');
@@ -86,6 +104,41 @@ export function SuperAdminDashboard() {
       address: company.address ?? '',
     });
     setShowEditCompanyDialog(true);
+  };
+
+  const openEditUser = (user: any) => {
+    setEditingUserId(user.id);
+    setEditUserFormData({
+      name: user.name ?? '',
+      phone: user.phone ?? '',
+      role: user.role ?? 'Client',
+      status: user.status ?? 'Active',
+    });
+    setShowEditUserDialog(true);
+  };
+
+  const handleUpdateUser = () => {
+    if (!editingUserId) return;
+    if (!authToken) {
+      toast.error('Missing auth token');
+      return;
+    }
+
+    (async () => {
+      try {
+        await updateUser(authToken, editingUserId, {
+          name: editUserFormData.name,
+          phone: editUserFormData.phone,
+          role: editUserFormData.role as any,
+          status: editUserFormData.status as any,
+        } as any);
+        toast.success('User updated');
+        setShowEditUserDialog(false);
+        setEditingUserId(null);
+      } catch (err: any) {
+        toast.error(err?.message || 'Failed to update user');
+      }
+    })();
   };
 
   const handleUpdateCompany = () => {
@@ -472,6 +525,47 @@ export function SuperAdminDashboard() {
                       placeholder="123 Main Street, City, State ZIP"
                     />
                   </div>
+
+                  <div className="pt-2 border-t">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">Admin Account</p>
+                      <p className="text-xs text-gray-600">Create the first Admin user for this company.</p>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="adminName">Admin Name *</Label>
+                        <Input
+                          id="adminName"
+                          value={companyFormData.adminName}
+                          onChange={(e) => setCompanyFormData({ ...companyFormData, adminName: e.target.value })}
+                          placeholder="Company Admin"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="adminEmail">Admin Email *</Label>
+                        <Input
+                          id="adminEmail"
+                          type="email"
+                          value={companyFormData.adminEmail}
+                          onChange={(e) => setCompanyFormData({ ...companyFormData, adminEmail: e.target.value })}
+                          placeholder="admin@company.com"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-4 space-y-2">
+                      <Label htmlFor="adminPassword">Admin Password *</Label>
+                      <Input
+                        id="adminPassword"
+                        type="password"
+                        value={companyFormData.adminPassword}
+                        onChange={(e) => setCompanyFormData({ ...companyFormData, adminPassword: e.target.value })}
+                        placeholder="Minimum 6 characters"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <DialogFooter>
@@ -481,7 +575,7 @@ export function SuperAdminDashboard() {
                   <Button
                     className="bg-indigo-600 hover:bg-indigo-700"
                     onClick={handleRegisterCompany}
-                    disabled={!companyFormData.name || !companyFormData.contactEmail}
+                    disabled={!companyFormData.name || !companyFormData.contactEmail || !companyFormData.adminName || !companyFormData.adminEmail || !companyFormData.adminPassword}
                   >
                     Submit Registration
                   </Button>
@@ -612,6 +706,16 @@ export function SuperAdminDashboard() {
                           <TableCell className="text-gray-700">{companyName}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-2"
+                                disabled={user.role === 'SuperAdmin'}
+                                onClick={() => openEditUser(user)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                                Edit
+                              </Button>
                               {user.status === 'Active' ? (
                                 <Button
                                   size="sm"
@@ -654,6 +758,87 @@ export function SuperAdminDashboard() {
                 </Table>
               </CardContent>
             </Card>
+
+            <Dialog open={showEditUserDialog} onOpenChange={setShowEditUserDialog}>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Edit User</DialogTitle>
+                  <DialogDescription>Update user details and access.</DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="editUserName">Name *</Label>
+                    <Input
+                      id="editUserName"
+                      value={editUserFormData.name}
+                      onChange={(e) => setEditUserFormData({ ...editUserFormData, name: e.target.value })}
+                      placeholder="Full name"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="editUserPhone">Phone</Label>
+                    <Input
+                      id="editUserPhone"
+                      value={editUserFormData.phone}
+                      onChange={(e) => setEditUserFormData({ ...editUserFormData, phone: e.target.value })}
+                      placeholder="Phone number"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="editUserRole">Role</Label>
+                      <select
+                        id="editUserRole"
+                        className="w-full h-10 border rounded px-3 text-sm"
+                        value={editUserFormData.role}
+                        onChange={(e) => setEditUserFormData({ ...editUserFormData, role: e.target.value })}
+                        disabled={editUserFormData.role === 'SuperAdmin'}
+                      >
+                        <option value="Client">Client</option>
+                        <option value="Admin">Admin</option>
+                        <option value="SuperAdmin">SuperAdmin</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="editUserStatus">Status</Label>
+                      <select
+                        id="editUserStatus"
+                        className="w-full h-10 border rounded px-3 text-sm"
+                        value={editUserFormData.status}
+                        onChange={(e) => setEditUserFormData({ ...editUserFormData, status: e.target.value })}
+                        disabled={editUserFormData.role === 'SuperAdmin'}
+                      >
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowEditUserDialog(false);
+                      setEditingUserId(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    className="bg-indigo-600 hover:bg-indigo-700"
+                    onClick={handleUpdateUser}
+                    disabled={!editUserFormData.name}
+                  >
+                    Save Changes
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
         </Tabs>
       </main>
