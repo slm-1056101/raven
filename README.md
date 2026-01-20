@@ -111,6 +111,8 @@ docker compose exec backend python manage.py migrate
 docker compose exec backend python manage.py seed_demo
 ```
 
+
+
 ## Notes
 
 - If you add or change backend models, run Django migrations.
