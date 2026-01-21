@@ -3,8 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app
 import { Button } from '@/app/components/ui/button';
 import { Badge } from '@/app/components/ui/badge';
 import { useApp } from '@/app/context/AppContext';
-import { toast } from 'sonner';
-
+import { notifyError } from '@/app/notify';
 import { apiFetch } from '@/app/api';
 import type { Company } from '@/app/types';
 
@@ -23,13 +22,13 @@ export function CompanySelection() {
 
   const handleSelectCompany = async (company: Company) => {
     if (!currentUser) {
-      toast.error('Please login to continue');
+      notifyError('Please login to continue');
       setCurrentView('login');
       return;
     }
 
     if (!authToken) {
-      toast.error('Missing auth token');
+      notifyError('Missing auth token');
       setCurrentView('login');
       return;
     }
@@ -49,7 +48,7 @@ export function CompanySelection() {
       const activeCompany = data.companies.find((c) => c.id === company.id) ?? company;
       setCurrentCompany(activeCompany);
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to switch company');
+      notifyError(err?.message || 'Failed to switch company');
       return;
     }
 
@@ -69,7 +68,7 @@ export function CompanySelection() {
       return;
     }
 
-    toast.error('Unsupported user role');
+    notifyError('Unsupported user role');
   };
 
   const getStatusColor = (status: string) => {

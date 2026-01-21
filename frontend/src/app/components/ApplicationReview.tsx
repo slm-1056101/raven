@@ -7,8 +7,8 @@ import { Badge } from '@/app/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
 import { useApp } from '@/app/context/AppContext';
+import { notifyError, notifySuccess } from '@/app/notify';
 import { format } from 'date-fns';
-import { toast } from 'sonner';
 
 import type { Application } from '@/app/types';
 
@@ -52,7 +52,7 @@ export function ApplicationReview() {
   const handlePreviewDocument = (application: Application, kind: 'idDocument' | 'proofOfFunds') => {
     const raw = (application as any)?.documents?.[kind] as string | null | undefined;
     if (!raw) {
-      toast.error('No document available');
+      notifyError('No document available');
       return;
     }
 
@@ -125,17 +125,17 @@ export function ApplicationReview() {
   const handleApprove = () => {
     if (selectedApplication) {
       if (!authToken) {
-        toast.error('Missing auth token');
+        notifyError('Missing auth token');
         return;
       }
       (async () => {
         try {
           await updateApplication(authToken, selectedApplication.id, { status: 'Approved' });
-          toast.success('Application approved successfully');
+          notifySuccess('Application approved successfully');
           setShowReviewDialog(false);
           setSelectedApplication(null);
         } catch (err: any) {
-          toast.error(err?.message || 'Failed to approve application');
+          notifyError(err?.message || 'Failed to approve application');
         }
       })();
     }
@@ -144,17 +144,17 @@ export function ApplicationReview() {
   const handleReject = () => {
     if (selectedApplication) {
       if (!authToken) {
-        toast.error('Missing auth token');
+        notifyError('Missing auth token');
         return;
       }
       (async () => {
         try {
           await updateApplication(authToken, selectedApplication.id, { status: 'Rejected' });
-          toast.success('Application rejected');
+          notifySuccess('Application rejected');
           setShowReviewDialog(false);
           setSelectedApplication(null);
         } catch (err: any) {
-          toast.error(err?.message || 'Failed to reject application');
+          notifyError(err?.message || 'Failed to reject application');
         }
       })();
     }

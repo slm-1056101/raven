@@ -4,7 +4,7 @@ import { Button } from '@/app/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
-import { toast } from 'sonner';
+import { notifyError, notifySuccess } from '@/app/notify';
 import { useApp } from '@/app/context/AppContext';
 import { apiFetch } from '@/app/api';
 import type { Company, User } from '@/app/types';
@@ -27,7 +27,7 @@ export function Signup() {
         const list = await apiFetch<Company[]>('/api/public/companies/');
         setCompanies(list);
       } catch (err: any) {
-        toast.error(err?.message || 'Failed to load companies');
+        notifyError(err?.message || 'Failed to load companies');
       }
     })();
   }, []);
@@ -39,19 +39,19 @@ export function Signup() {
   const handleSignup = async () => {
     const normalizedEmail = email.trim().toLowerCase();
     if (!name.trim()) {
-      toast.error('Please enter your name');
+      notifyError('Please enter your name');
       return;
     }
     if (!normalizedEmail) {
-      toast.error('Please enter your email');
+      notifyError('Please enter your email');
       return;
     }
     if (!password) {
-      toast.error('Please enter your password');
+      notifyError('Please enter your password');
       return;
     }
     if (selectedIds.length === 0) {
-      toast.error('Please select at least one company');
+      notifyError('Please select at least one company');
       return;
     }
 
@@ -74,9 +74,9 @@ export function Signup() {
       hydrateFromApi(data);
 
       setCurrentView('company-selection');
-      toast.success('Account created');
+      notifySuccess('Account created');
     } catch (err: any) {
-      toast.error(err?.message || 'Signup failed');
+      notifyError(err?.message || 'Signup failed');
       setAuthToken(null);
     }
   };

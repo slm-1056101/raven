@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/app/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/app/components/ui/alert-dialog';
 import { useApp } from '@/app/context/AppContext';
-import { toast } from 'sonner';
+import { notifyError, notifySuccess } from '@/app/notify';
 
 import type { Property } from '@/app/types';
 
@@ -65,11 +65,11 @@ export function PropertyInventory() {
 
   const handleSave = () => {
     if (!authToken) {
-      toast.error('Missing auth token');
+      notifyError('Missing auth token');
       return;
     }
     if (!currentCompany) {
-      toast.error('Please select a company');
+      notifyError('Please select a company');
       return;
     }
 
@@ -96,7 +96,7 @@ export function PropertyInventory() {
         if (editingProperty) {
           const payload = imageFile ? (buildFormData() as any) : formData;
           await updateProperty(authToken, editingProperty.id, payload);
-          toast.success('Property updated successfully');
+          notifySuccess('Property updated successfully');
         } else {
           const payload = imageFile
             ? (buildFormData({ companyId: currentCompany.id }) as any)
@@ -105,27 +105,27 @@ export function PropertyInventory() {
                 companyId: currentCompany.id,
               };
           await createProperty(authToken, payload);
-          toast.success('Property added successfully');
+          notifySuccess('Property added successfully');
         }
         setShowEditDialog(false);
       } catch (err: any) {
-        toast.error(err?.message || 'Failed to save property');
+        notifyError(err?.message || 'Failed to save property');
       }
     })();
   };
 
   const handleDelete = (id: string) => {
     if (!authToken) {
-      toast.error('Missing auth token');
+      notifyError('Missing auth token');
       return;
     }
     (async () => {
       try {
         await deleteProperty(authToken, id);
-        toast.success('Property deleted successfully');
+        notifySuccess('Property deleted successfully');
         setDeletingPropertyId(null);
       } catch (err: any) {
-        toast.error(err?.message || 'Failed to delete property');
+        notifyError(err?.message || 'Failed to delete property');
       }
     })();
   };

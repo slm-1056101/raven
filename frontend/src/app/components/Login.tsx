@@ -5,7 +5,7 @@ import { Button } from '@/app/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
-import { toast } from 'sonner';
+import { notifyError } from '@/app/notify';
 
 import { apiFetch } from '@/app/api';
 import type { User } from '@/app/types';
@@ -18,12 +18,12 @@ export function Login() {
   const handleLogin = async () => {
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail) {
-      toast.error('Please enter your email');
+      notifyError('Please enter your email');
       return;
     }
 
     if (!password) {
-      toast.error('Please enter your password');
+      notifyError('Please enter your password');
       return;
     }
 
@@ -63,7 +63,7 @@ export function Login() {
 
       setCurrentView('client');
     } catch (err: any) {
-      toast.error(err?.message || 'Login failed');
+      notifyError(err?.message || 'Login failed');
       setAuthToken(null);
     }
   };

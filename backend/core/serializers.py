@@ -18,7 +18,26 @@ class CompanySerializer(serializers.ModelSerializer):
     primaryColor = serializers.CharField(source='primary_color', required=False, allow_blank=True)
     contactEmail = serializers.EmailField(source='contact_email', required=False, allow_blank=True)
     contactPhone = serializers.CharField(source='contact_phone', required=False, allow_blank=True)
+    subscriptionPlan = serializers.CharField(source='subscription_plan', required=False, allow_blank=True)
+    maxPlots = serializers.IntegerField(source='max_plots', required=False)
     registeredDate = serializers.SerializerMethodField()
+
+    def validate(self, attrs):
+        instance = getattr(self, 'instance', None)
+        if instance is not None and 'max_plots' in attrs:
+            next_max_plots = attrs.get('max_plots')
+            if next_max_plots is not None:
+                current_count = Property.objects.filter(company_id=instance.id).count()
+                if next_max_plots < current_count:
+                    raise ValidationError(
+                        {
+                            'maxPlots': (
+                                f"Cannot downgrade maxPlots to {next_max_plots}. "
+                                f"This company already has {current_count} properties."
+                            )
+                        }
+                    )
+        return super().validate(attrs)
 
     def get_registeredDate(self, obj):
         value = getattr(obj, 'registered_date', None)
@@ -36,6 +55,8 @@ class CompanySerializer(serializers.ModelSerializer):
             'primaryColor',
             'status',
             'registeredDate',
+            'subscriptionPlan',
+            'maxPlots',
             'contactEmail',
             'contactPhone',
             'address',
@@ -237,7 +258,12 @@ class PropertySerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         company_id = validated_data.pop('company_id', None)
         if company_id:
-            validated_data['company'] = Company.objects.get(id=company_id)
+            company = Company.objects.get(id=company_id)
+            current_count = Property.objects.filter(company_id=company.id).count()
+            max_plots = getattr(company, 'max_plots', None)
+            if isinstance(max_plots, int) and max_plots >= 0 and current_count >= max_plots:
+                raise ValidationError({'detail': f"Subscription limit reached: maxPlots={max_plots}. Upgrade plan to add more plots."})
+            validated_data['company'] = company
         return super().create(validated_data)
 
 

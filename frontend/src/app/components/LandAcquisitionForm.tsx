@@ -9,7 +9,7 @@ import { Textarea } from '@/app/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
 import { Progress } from '@/app/components/ui/progress';
 import { useApp } from '@/app/context/AppContext';
-import { toast } from 'sonner';
+import { notifyError, notifySuccess } from '@/app/notify';
 
 import type { Property } from '@/app/types';
 
@@ -74,22 +74,22 @@ export function LandAcquisitionForm({ property, onClose }: LandAcquisitionFormPr
 
   const onSubmit = (data: FormData) => {
     if (!authToken) {
-      toast.error('Missing auth token');
+      notifyError('Missing auth token');
       return;
     }
     const companyId = currentCompany?.id || property.companyId;
     if (!companyId) {
-      toast.error('Missing company');
+      notifyError('Missing company');
       return;
     }
 
     if (!idDocumentFile) {
-      toast.error('ID Document is required');
+      notifyError('ID Document is required');
       return;
     }
 
     if (!proofOfFundsFile) {
-      toast.error('Proof of Funds is required');
+      notifyError('Proof of Funds is required');
       return;
     }
 
@@ -111,10 +111,10 @@ export function LandAcquisitionForm({ property, onClose }: LandAcquisitionFormPr
         fd.append('proofOfFunds', proofOfFundsFile);
 
         await createApplication(authToken, fd as any);
-        toast.success('Application submitted successfully!');
+        notifySuccess('Application submitted successfully!');
         onClose();
       } catch (err: any) {
-        toast.error(err?.message || 'Failed to submit application');
+        notifyError(err?.message || 'Failed to submit application');
       }
     })();
   };

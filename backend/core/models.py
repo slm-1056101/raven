@@ -23,6 +23,9 @@ class Company(models.Model):
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
     registered_date = models.DateField(default=timezone.now)
 
+    subscription_plan = models.CharField(max_length=64, blank=True, default='Starter')
+    max_plots = models.PositiveIntegerField(default=10)
+
     contact_email = models.EmailField(blank=True)
     contact_phone = models.CharField(max_length=64, blank=True)
     address = models.CharField(max_length=255, blank=True)

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Building2, CheckCircle, Shield, Users, Building, Power, ArrowLeft, Pencil, Trash2 } from 'lucide-react';
 import { useApp } from '@/app/context/AppContext';
+import { notifyError, notifySuccess } from '@/app/notify';
 import { Badge } from '@/app/components/ui/badge';
 import { Button } from '@/app/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
@@ -11,11 +12,10 @@ import { Label } from '@/app/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/app/components/ui/table';
 import { Textarea } from '@/app/components/ui/textarea';
-import { toast } from 'sonner';
 
 function statusBadgeVariant(status: string) {
   if (status === 'Active') return 'bg-green-600 text-white';
-  if (status === 'Pending') return 'bg-yellow-500 text-white';
+  if (status === 'Pending') return 'bg-amber-500 text-white';
   if (status === 'Inactive') return 'bg-gray-500 text-white';
   return 'bg-gray-500 text-white';
 }
@@ -31,6 +31,8 @@ export function SuperAdminDashboard() {
     contactEmail: '',
     contactPhone: '',
     address: '',
+    subscriptionPlan: 'Starter',
+    maxPlots: 10,
     adminName: '',
     adminEmail: '',
     adminPassword: '',
@@ -44,6 +46,8 @@ export function SuperAdminDashboard() {
     contactEmail: '',
     contactPhone: '',
     address: '',
+    subscriptionPlan: 'Starter',
+    maxPlots: 10,
   });
 
   const [showEditUserDialog, setShowEditUserDialog] = useState(false);
@@ -57,7 +61,7 @@ export function SuperAdminDashboard() {
 
   const handleRegisterCompany = () => {
     if (!authToken) {
-      toast.error('Missing auth token');
+      notifyError('Missing auth token');
       return;
     }
 
@@ -69,6 +73,8 @@ export function SuperAdminDashboard() {
           logo: '🏢',
           primaryColor: '#2563EB',
           status: 'Pending',
+          subscriptionPlan: companyFormData.subscriptionPlan,
+          maxPlots: Number(companyFormData.maxPlots),
           contactEmail: companyFormData.contactEmail,
           contactPhone: companyFormData.contactPhone,
           address: companyFormData.address,
@@ -76,7 +82,7 @@ export function SuperAdminDashboard() {
           adminEmail: companyFormData.adminEmail,
           adminPassword: companyFormData.adminPassword,
         } as any);
-        toast.success('Company created');
+        notifySuccess('Company created');
         setShowNewCompanyDialog(false);
         setCompanyFormData({
           name: '',
@@ -84,12 +90,14 @@ export function SuperAdminDashboard() {
           contactEmail: '',
           contactPhone: '',
           address: '',
+          subscriptionPlan: 'Starter',
+          maxPlots: 10,
           adminName: '',
           adminEmail: '',
           adminPassword: '',
         });
       } catch (err: any) {
-        toast.error(err?.message || 'Failed to create company');
+        notifyError(err?.message || 'Failed to create company');
       }
     })();
   };
@@ -102,6 +110,8 @@ export function SuperAdminDashboard() {
       contactEmail: company.contactEmail ?? '',
       contactPhone: company.contactPhone ?? '',
       address: company.address ?? '',
+      subscriptionPlan: company.subscriptionPlan ?? 'Starter',
+      maxPlots: company.maxPlots ?? 10,
     });
     setShowEditCompanyDialog(true);
   };
@@ -120,7 +130,7 @@ export function SuperAdminDashboard() {
   const handleUpdateUser = () => {
     if (!editingUserId) return;
     if (!authToken) {
-      toast.error('Missing auth token');
+      notifyError('Missing auth token');
       return;
     }
 
@@ -132,11 +142,11 @@ export function SuperAdminDashboard() {
           role: editUserFormData.role as any,
           status: editUserFormData.status as any,
         } as any);
-        toast.success('User updated');
+        notifySuccess('User updated');
         setShowEditUserDialog(false);
         setEditingUserId(null);
       } catch (err: any) {
-        toast.error(err?.message || 'Failed to update user');
+        notifyError(err?.message || 'Failed to update user');
       }
     })();
   };
@@ -144,7 +154,7 @@ export function SuperAdminDashboard() {
   const handleUpdateCompany = () => {
     if (!editingCompanyId) return;
     if (!authToken) {
-      toast.error('Missing auth token');
+      notifyError('Missing auth token');
       return;
     }
 
@@ -156,12 +166,14 @@ export function SuperAdminDashboard() {
           contactEmail: editCompanyFormData.contactEmail,
           contactPhone: editCompanyFormData.contactPhone,
           address: editCompanyFormData.address,
+          subscriptionPlan: editCompanyFormData.subscriptionPlan,
+          maxPlots: Number(editCompanyFormData.maxPlots),
         });
-        toast.success('Company updated');
+        notifySuccess('Company updated');
         setShowEditCompanyDialog(false);
         setEditingCompanyId(null);
       } catch (err: any) {
-        toast.error(err?.message || 'Failed to update company');
+        notifyError(err?.message || 'Failed to update company');
       }
     })();
   };
@@ -330,8 +342,9 @@ export function SuperAdminDashboard() {
                     <TableRow>
                       <TableHead>Company</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Registered</TableHead>
+                      <TableHead>Plan</TableHead>
                       <TableHead>Contact</TableHead>
+                      <TableHead>Registered</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -350,13 +363,19 @@ export function SuperAdminDashboard() {
                         <TableCell>
                           <Badge className={statusBadgeVariant(company.status)}>{company.status}</Badge>
                         </TableCell>
-                        <TableCell className="text-gray-700">{company.registeredDate}</TableCell>
                         <TableCell className="text-gray-700">
                           <div className="space-y-1">
-                            <div className="text-sm">{company.contactEmail}</div>
+                            <div className="text-sm font-medium">{company.subscriptionPlan ?? 'Starter'}</div>
+                            <div className="text-xs text-gray-600">Max plots: {company.maxPlots ?? 10}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="text-sm font-medium">{company.contactEmail}</div>
                             <div className="text-xs text-gray-600">{company.contactPhone}</div>
                           </div>
                         </TableCell>
+                        <TableCell className="text-gray-700">{company.registeredDate}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button
@@ -375,7 +394,7 @@ export function SuperAdminDashboard() {
                                 className="bg-green-600 hover:bg-green-700 gap-2"
                                 onClick={() => {
                                   if (!authToken) {
-                                    toast.error('Missing auth token');
+                                    notifyError('Missing auth token');
                                     return;
                                   }
                                   updateCompany(authToken, company.id, { status: 'Active' });
@@ -393,7 +412,7 @@ export function SuperAdminDashboard() {
                                 className="gap-2"
                                 onClick={() => {
                                   if (!authToken) {
-                                    toast.error('Missing auth token');
+                                    notifyError('Missing auth token');
                                     return;
                                   }
                                   updateCompany(authToken, company.id, { status: 'Inactive' });
@@ -411,7 +430,7 @@ export function SuperAdminDashboard() {
                                 className="gap-2"
                                 onClick={() => {
                                   if (!authToken) {
-                                    toast.error('Missing auth token');
+                                    notifyError('Missing auth token');
                                     return;
                                   }
                                   updateCompany(authToken, company.id, { status: 'Active' });
@@ -441,11 +460,11 @@ export function SuperAdminDashboard() {
                                   <AlertDialogAction
                                     onClick={() => {
                                       if (!authToken) {
-                                        toast.error('Missing auth token');
+                                        notifyError('Missing auth token');
                                         return;
                                       }
                                       deleteCompany(authToken, company.id);
-                                      toast.success('Company deleted');
+                                      notifySuccess('Company deleted');
                                     }}
                                   >
                                     Delete
@@ -524,6 +543,33 @@ export function SuperAdminDashboard() {
                       onChange={(e) => setCompanyFormData({ ...companyFormData, address: e.target.value })}
                       placeholder="123 Main Street, City, State ZIP"
                     />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="subscriptionPlan">Subscription Plan *</Label>
+                      <select
+                        id="subscriptionPlan"
+                        className="w-full h-10 border rounded px-3 text-sm"
+                        value={companyFormData.subscriptionPlan}
+                        onChange={(e) => setCompanyFormData({ ...companyFormData, subscriptionPlan: e.target.value })}
+                      >
+                        <option value="Starter">Starter</option>
+                        <option value="Growth">Growth</option>
+                        <option value="Enterprise">Enterprise</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="maxPlots">Max Plots *</Label>
+                      <Input
+                        id="maxPlots"
+                        type="number"
+                        min={0}
+                        value={companyFormData.maxPlots}
+                        onChange={(e) => setCompanyFormData({ ...companyFormData, maxPlots: Number(e.target.value) })}
+                        placeholder="10"
+                      />
+                    </div>
                   </div>
 
                   <div className="pt-2 border-t">
@@ -637,6 +683,34 @@ export function SuperAdminDashboard() {
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="editSubscriptionPlan">Subscription Plan *</Label>
+                      <select
+                        id="editSubscriptionPlan"
+                        className="w-full h-10 border rounded px-3 text-sm"
+                        value={editCompanyFormData.subscriptionPlan}
+                        onChange={(e) => setEditCompanyFormData({ ...editCompanyFormData, subscriptionPlan: e.target.value })}
+                      >
+                        <option value="Starter">Starter</option>
+                        <option value="Growth">Growth</option>
+                        <option value="Enterprise">Enterprise</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="editMaxPlots">Max Plots *</Label>
+                      <Input
+                        id="editMaxPlots"
+                        type="number"
+                        min={0}
+                        value={editCompanyFormData.maxPlots}
+                        onChange={(e) => setEditCompanyFormData({ ...editCompanyFormData, maxPlots: Number(e.target.value) })}
+                        placeholder="10"
+                      />
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="editAddress">Business Address *</Label>
                     <Input
@@ -724,7 +798,7 @@ export function SuperAdminDashboard() {
                                   disabled={user.role === 'SuperAdmin'}
                                   onClick={() => {
                                     if (!authToken) {
-                                      toast.error('Missing auth token');
+                                      notifyError('Missing auth token');
                                       return;
                                     }
                                     updateUser(authToken, user.id, { status: 'Inactive' });
@@ -739,7 +813,7 @@ export function SuperAdminDashboard() {
                                   className="bg-green-600 hover:bg-green-700 gap-2"
                                   onClick={() => {
                                     if (!authToken) {
-                                      toast.error('Missing auth token');
+                                      notifyError('Missing auth token');
                                       return;
                                     }
                                     updateUser(authToken, user.id, { status: 'Active' });

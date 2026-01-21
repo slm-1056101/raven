@@ -55,6 +55,8 @@ export interface Company {
   primaryColor: string;
   status: 'Active' | 'Pending' | 'Inactive';
   registeredDate: string;
+  subscriptionPlan?: string;
+  maxPlots?: number;
   contactEmail: string;
   contactPhone: string;
   address: string;

@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
 import { useApp } from '@/app/context/AppContext';
 import { format } from 'date-fns';
-import { toast } from 'sonner';
+import { notifyError, notifySuccess } from '@/app/notify';
 
 import type { User } from '@/app/types';
 
@@ -45,16 +45,16 @@ export function UserManagement() {
   const handleSave = () => {
     if (editingUser) {
       if (!authToken) {
-        toast.error('Missing auth token');
+        notifyError('Missing auth token');
         return;
       }
       (async () => {
         try {
           await updateUser(authToken, editingUser.id, formData);
-          toast.success('User updated successfully');
+          notifySuccess('User updated successfully');
           setShowEditDialog(false);
         } catch (err: any) {
-          toast.error(err?.message || 'Failed to update user');
+          notifyError(err?.message || 'Failed to update user');
         }
       })();
     }
@@ -63,15 +63,15 @@ export function UserManagement() {
   const handleToggleStatus = (user: User) => {
     const newStatus = user.status === 'Active' ? 'Inactive' : 'Active';
     if (!authToken) {
-      toast.error('Missing auth token');
+      notifyError('Missing auth token');
       return;
     }
     (async () => {
       try {
         await updateUser(authToken, user.id, { status: newStatus });
-        toast.success(`User ${newStatus === 'Active' ? 'activated' : 'deactivated'} successfully`);
+        notifySuccess(`User ${newStatus === 'Active' ? 'activated' : 'deactivated'} successfully`);
       } catch (err: any) {
-        toast.error(err?.message || 'Failed to update user');
+        notifyError(err?.message || 'Failed to update user');
       }
     })();
   };
