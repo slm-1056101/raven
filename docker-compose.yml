@@ -1,5 +1,6 @@
 services:
   db:
+    container_name: raven-db
     image: postgres:16
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-raven}
@@ -11,12 +12,13 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   backend:
+    container_name: raven-backend
     build:
       context: ./backend
     environment:
       DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-insecure-change-me}
-      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend,raven-backend}
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-raven}
@@ -29,6 +31,21 @@ services:
       - db
     volumes:
       - ./backend:/app
+
+  frontend:
+    container_name: raven-frontend
+    image: node:20
+    working_dir: /app
+    environment:
+      VITE_API_PROXY_TARGET: http://backend:8000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
 
 volumes:
   postgres_data:
