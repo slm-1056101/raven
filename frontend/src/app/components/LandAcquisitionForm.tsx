@@ -1,6 +1,6 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { User, FileText, DollarSign, Upload, CheckCircle2, AlertCircle, MapPin, Square, Building2 } from 'lucide-react';
+import { ArrowLeft, User, FileText, DollarSign, Upload, CheckCircle2, AlertCircle, MapPin, Square, Building2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
@@ -9,7 +9,8 @@ import { Textarea } from '@/app/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
 import { Progress } from '@/app/components/ui/progress';
 import { useApp } from '@/app/context/AppContext';
-import { notifyError, notifySuccess } from '@/app/notify';
+import { notifyError, notifyInfo, notifySuccess } from '@/app/notify';
+import { apiFetch } from '@/app/api';
 
 import type { Property } from '@/app/types';
 
@@ -32,7 +33,7 @@ interface FormData {
 }
 
 export function LandAcquisitionForm({ property, onClose }: LandAcquisitionFormProps) {
-  const { createApplication, currentCompany, currentUser, authToken } = useApp();
+  const { createApplication, currentCompany, currentUser, authToken, setCurrentView } = useApp();
   const [currentStep, setCurrentStep] = useState(1);
   const [idDocumentFile, setIdDocumentFile] = useState<File | null>(null);
   const [proofOfFundsFile, setProofOfFundsFile] = useState<File | null>(null);
@@ -73,10 +74,6 @@ export function LandAcquisitionForm({ property, onClose }: LandAcquisitionFormPr
   };
 
   const onSubmit = (data: FormData) => {
-    if (!authToken) {
-      notifyError('Missing auth token');
-      return;
-    }
     const companyId = currentCompany?.id || property.companyId;
     if (!companyId) {
       notifyError('Missing company');
@@ -110,9 +107,21 @@ export function LandAcquisitionForm({ property, onClose }: LandAcquisitionFormPr
         fd.append('idDocument', idDocumentFile);
         fd.append('proofOfFunds', proofOfFundsFile);
 
-        await createApplication(authToken, fd as any);
+        if (authToken) {
+          await createApplication(authToken, fd as any);
+          notifySuccess('Application submitted successfully!');
+          onClose();
+          return;
+        }
+
+        await apiFetch('/api/public/applications/', {
+          method: 'POST',
+          body: fd as any,
+        });
         notifySuccess('Application submitted successfully!');
+        notifyInfo('Next step', 'Create an account or log in to manage your properties and applications.');
         onClose();
+        setCurrentView('login');
       } catch (err: any) {
         notifyError(err?.message || 'Failed to submit application');
       }
@@ -179,7 +188,13 @@ export function LandAcquisitionForm({ property, onClose }: LandAcquisitionFormPr
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between mb-2">
-            <CardTitle>Land Acquisition Application</CardTitle>
+            <div className="flex items-center gap-3">
+              <Button type="button" variant="outline" size="sm" className="gap-2" onClick={onClose}>
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </Button>
+              <CardTitle>Land Acquisition Application</CardTitle>
+            </div>
             <span className="text-sm text-gray-600">Step {currentStep} of 4 ({Math.round(progress)}%)</span>
           </div>
           <Progress value={progress} className="h-2" />

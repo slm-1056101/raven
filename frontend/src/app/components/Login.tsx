@@ -11,7 +11,18 @@ import { apiFetch } from '@/app/api';
 import type { User } from '@/app/types';
 
 export function Login() {
-  const { setCurrentUser, setCurrentCompany, setCurrentView, setAuthToken, hydrateFromApi, refreshAll, intendedCompanyId, setIntendedCompanyId } = useApp();
+  const {
+    setCurrentUser,
+    setCurrentCompany,
+    setCurrentView,
+    setAuthToken,
+    hydrateFromApi,
+    refreshAll,
+    intendedCompanyId,
+    setIntendedCompanyId,
+    intendedCompanyName,
+    setIntendedCompanyName,
+  } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -58,6 +69,7 @@ export function Login() {
           // If switching fails (e.g., user not a member), fall back to normal flow.
         } finally {
           setIntendedCompanyId(null);
+          setIntendedCompanyName(null);
         }
       }
 
@@ -101,7 +113,7 @@ export function Login() {
           <div className="flex items-center gap-3">
             <Building2 className="h-8 w-8 text-blue-600" />
             <div>
-              <h1 className="text-2xl font-bold">Raven</h1>
+              <h1 className="text-2xl font-bold">{intendedCompanyName || 'Suwokono'}</h1>
               <p className="text-sm text-gray-600">Sign in to continue</p>
             </div>
           </div>

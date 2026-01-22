@@ -217,7 +217,7 @@ export function SuperAdminDashboard() {
               </div>
               <div className="min-w-0">
                 <div className="flex items-baseline gap-3 flex-wrap">
-                  <h1 className="text-2xl font-bold">Raven</h1>
+                  <h1 className="text-2xl font-bold">Suwokono</h1>
                   <span className="text-sm text-gray-600">Super Admin Portal</span>
                 </div>
                 <p className="text-sm text-gray-600 truncate">System-wide access to companies, users, and approvals</p>
@@ -261,7 +261,7 @@ export function SuperAdminDashboard() {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm text-gray-600">Companies</CardTitle>
-                  <CardDescription>All tenants in Raven</CardDescription>
+                  <CardDescription>All tenants in Suwokono</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <div className="text-3xl font-bold">{companies.length}</div>

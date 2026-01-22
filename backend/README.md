@@ -1,6 +1,6 @@
 # Backend
 
-This folder contains the Django backend for the Raven project.
+This folder contains the Django backend for the Suwokono project.
 
 Quick start
 -----------

@@ -75,61 +75,18 @@ export function LandingPage() {
     setCurrentView('company-landing');
   };
 
-  const handleApplyNow = (inv: Property & { companyName?: string }) => {
-    if (!inv.companyId) {
-      setCurrentView('login');
-      return;
-    }
-
-    if (!currentUser || !authToken) {
-      setIntendedCompanyId(inv.companyId);
-      setCurrentView('login');
-      return;
-    }
-
-    (async () => {
-      try {
-        if ((currentUser as any).role !== 'SuperAdmin') {
-          const updatedUser = await apiFetch('/api/auth/active-company/', {
-            token: authToken,
-            method: 'POST',
-            body: JSON.stringify({ companyId: inv.companyId }),
-          });
-
-          setCurrentUser(updatedUser as any);
-
-          const nextRole = (updatedUser as any)?.role as string | undefined;
-          const data = await refreshAll(authToken, { includeUsers: nextRole !== 'Client' });
-          hydrateFromApi(data);
-
-          const nextCompany = data.companies.find((c) => c.id === inv.companyId) ?? null;
-          setCurrentCompany(nextCompany);
-
-          if ((updatedUser as any).role === 'Admin') {
-            setCurrentView('admin');
-            return;
-          }
-
-          if ((updatedUser as any).role === 'Client') {
-            setCurrentView('client');
-            return;
-          }
-        }
-
-        setCurrentView('super-admin');
-      } catch {
-        setIntendedCompanyId(inv.companyId);
-        setCurrentView('login');
-      }
-    })();
-  };
-
   useEffect(() => {
     setIsLoadingInventories(true);
     (async () => {
       try {
-        const data = await apiFetch<(Property & { companyName?: string })[]>('/api/public/properties/');
-        setInventories(Array.isArray(data) ? data : []);
+        const data = await apiFetch<(Property & { companyName?: string; company?: string | null })[]>('/api/public/properties/');
+        const normalized = (Array.isArray(data) ? data : []).map((p: any) => ({
+          ...p,
+          companyId: (p.companyId ?? p.company ?? null) as string,
+          price: typeof p.price === 'string' ? Number(p.price) : p.price,
+          size: typeof p.size === 'string' ? Number(p.size) : p.size,
+        }));
+        setInventories(normalized as any);
       } catch {
         setInventories([]);
       } finally {
@@ -146,7 +103,7 @@ export function LandingPage() {
           <div className="flex items-center gap-3">
             <Building2 className="h-8 w-8 text-blue-600" />
             <div>
-              <h1 className="text-2xl font-bold">Raven</h1>
+              <h1 className="text-2xl font-bold">Suwokono</h1>
               <p className="text-sm text-gray-600">Multi-Tenant Property Management Platform</p>
             </div>
           </div>
@@ -157,7 +114,7 @@ export function LandingPage() {
       <div className="container mx-auto px-4 py-16">
         <div className="max-w-4xl mx-auto text-center space-y-6">
           <h2 className="text-5xl font-bold text-gray-900">
-            Welcome to Raven
+            Welcome to Suwokono
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Your comprehensive multi-tenant platform for managing vacant land acquisitions, applications, 
@@ -246,10 +203,6 @@ export function LandingPage() {
                 <h3 className="text-2xl font-bold text-gray-900">Available Inventories</h3>
                 <p className="text-sm text-gray-600">Browse listings from all companies</p>
               </div>
-              <Button variant="outline" onClick={() => setCurrentView('login')}>
-                Login to apply
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
             </div>
 
             <div className="mt-6">
@@ -343,20 +296,35 @@ export function LandingPage() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredInventories.map((inv) => (
-                    <Card key={inv.id} className="overflow-hidden">
+                    <Card
+                      key={inv.id}
+                      className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleOpenCompanyLanding(inv)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleOpenCompanyLanding(inv);
+                        }
+                      }}
+                      aria-label={`View ${inv.companyName || 'company'} inventory`}
+                    >
+                      <div className="relative h-48 bg-gray-200">
+                        <img
+                          src={inv.imageUrl || ''}
+                          alt={inv.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = '';
+                          }}
+                        />
+                      </div>
                       <CardHeader>
                         <div className="flex items-start justify-between gap-2">
                           <CardTitle className="text-lg">{inv.title}</CardTitle>
                           <div className="flex items-center gap-2">
                             {getPropertyIcon(inv.type)}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleOpenCompanyLanding(inv)}
-                              aria-label="View company landing"
-                            >
-                              <ArrowRight className="h-4 w-4" />
-                            </Button>
                           </div>
                         </div>
                         <CardDescription className="line-clamp-2">
@@ -382,9 +350,7 @@ export function LandingPage() {
                         </div>
 
                         <div className="pt-2">
-                          <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={() => handleApplyNow(inv)}>
-                            Apply Now
-                          </Button>
+                          <div className="text-xs text-gray-600">Click to view this company.</div>
                         </div>
                       </CardContent>
                     </Card>

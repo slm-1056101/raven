@@ -13,6 +13,7 @@ interface AppContextType {
   currentUser: User | null;
   authToken: string | null;
   intendedCompanyId: string | null;
+  intendedCompanyName: string | null;
   publicCompanyId: string | null;
   publicProperty: Property | null;
   setCurrentView: (view: 'landing' | 'companies-landing' | 'company-landing' | 'public-application' | 'login' | 'signup' | 'company-selection' | 'client' | 'admin' | 'super-admin') => void;
@@ -20,6 +21,7 @@ interface AppContextType {
   setCurrentUser: (user: User | null) => void;
   setAuthToken: (token: string | null) => void;
   setIntendedCompanyId: (companyId: string | null) => void;
+  setIntendedCompanyName: (companyName: string | null) => void;
   setPublicCompanyId: (companyId: string | null) => void;
   setPublicProperty: (property: Property | null) => void;
   refreshAll: (
@@ -59,6 +61,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [intendedCompanyId, setIntendedCompanyId] = useState<string | null>(null);
+  const [intendedCompanyName, setIntendedCompanyName] = useState<string | null>(null);
   const [publicCompanyId, setPublicCompanyId] = useState<string | null>(null);
   const [publicProperty, setPublicProperty] = useState<Property | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(() => {
@@ -303,6 +306,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         currentUser,
         authToken,
         intendedCompanyId,
+        intendedCompanyName,
         publicCompanyId,
         publicProperty,
         setCurrentView,
@@ -310,6 +314,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setCurrentUser,
         setAuthToken: setAuthTokenAndPersist,
         setIntendedCompanyId,
+        setIntendedCompanyName,
         setPublicCompanyId,
         setPublicProperty,
         refreshAll,
