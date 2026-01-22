@@ -11,7 +11,7 @@ import { apiFetch } from '@/app/api';
 import type { User } from '@/app/types';
 
 export function Login() {
-  const { setCurrentUser, setCurrentCompany, setCurrentView, setAuthToken, hydrateFromApi, refreshAll } = useApp();
+  const { setCurrentUser, setCurrentCompany, setCurrentView, setAuthToken, hydrateFromApi, refreshAll, intendedCompanyId, setIntendedCompanyId } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -39,23 +39,49 @@ export function Login() {
       const data = await refreshAll(token.access, { includeUsers: me.role !== 'Client' });
 
       hydrateFromApi(data);
-      setCurrentUser(me as any);
 
-      if (me.role === 'SuperAdmin') {
+      let effectiveUser: any = me as any;
+      let effectiveData = data;
+
+      if (effectiveUser.role !== 'SuperAdmin' && intendedCompanyId) {
+        try {
+          const updatedUser = await apiFetch('/api/auth/active-company/', {
+            token: token.access,
+            method: 'POST',
+            body: JSON.stringify({ companyId: intendedCompanyId }),
+          });
+
+          effectiveUser = updatedUser as any;
+          effectiveData = await refreshAll(token.access, { includeUsers: (effectiveUser as any).role !== 'Client' });
+          hydrateFromApi(effectiveData);
+        } catch {
+          // If switching fails (e.g., user not a member), fall back to normal flow.
+        } finally {
+          setIntendedCompanyId(null);
+        }
+      }
+
+      setCurrentUser(effectiveUser);
+
+      if (effectiveUser.role === 'SuperAdmin') {
         setCurrentCompany(null);
         setCurrentView('super-admin');
         return;
       }
 
-      const company = (me as any).companyId ? (data.companies.find((c: any) => c.id === (me as any).companyId) ?? null) : null;
+      const company = (effectiveUser as any).companyId
+        ? (effectiveData.companies.find((c: any) => c.id === (effectiveUser as any).companyId) ?? null)
+        : null;
       setCurrentCompany(company);
 
-      if (me.role === 'Admin') {
+      if (effectiveUser.role === 'Admin') {
         setCurrentView('admin');
         return;
       }
 
-      const ids = (me.companyIds && me.companyIds.length > 0) ? me.companyIds : (me.companyId ? [me.companyId] : []);
+      const ids = (effectiveUser.companyIds && effectiveUser.companyIds.length > 0)
+        ? effectiveUser.companyIds
+        : (effectiveUser.companyId ? [effectiveUser.companyId] : []);
       if (ids.length > 1) {
         setCurrentView('company-selection');
         return;

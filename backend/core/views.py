@@ -16,6 +16,7 @@ from .serializers import (
     ClientSignupSerializer,
     CompanyCreateSerializer,
     CompanySerializer,
+    PublicPropertySerializer,
     PropertySerializer,
     UserCreateSerializer,
     UserSerializer,
@@ -145,6 +146,40 @@ class PublicCompaniesView(APIView):
     def get(self, request):
         companies = Company.objects.all().order_by('name')
         return Response(CompanySerializer(companies, many=True).data)
+
+
+class PublicPropertiesView(APIView):
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        summary='Public properties list',
+        description='Public endpoint for the landing page marketplace. Returns all properties across all companies.',
+        responses={200: PublicPropertySerializer(many=True)},
+    )
+    def get(self, request):
+        company_id = request.query_params.get('companyId')
+        qs = Property.objects.select_related('company').all()
+        if company_id:
+            qs = qs.filter(company_id=company_id)
+        properties = qs.order_by('-id')
+        return Response(PublicPropertySerializer(properties, many=True, context={'request': request}).data)
+
+
+class PublicApplicationsView(APIView):
+    permission_classes = [AllowAny]
+    parser_classes = (JSONParser, MultiPartParser, FormParser)
+
+    @extend_schema(
+        summary='Public application create',
+        description='Public endpoint to submit a land acquisition application without requiring an account.',
+        request=ApplicationSerializer,
+        responses={201: ApplicationSerializer},
+    )
+    def post(self, request):
+        serializer = ApplicationSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        application = serializer.save()
+        return Response(ApplicationSerializer(application, context={'request': request}).data, status=201)
 
 
 class TenantScopedViewSetMixin:

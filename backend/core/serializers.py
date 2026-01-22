@@ -267,6 +267,15 @@ class PropertySerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
+class PublicPropertySerializer(PropertySerializer):
+    companyName = serializers.CharField(source='company.name', read_only=True)
+
+    class Meta(PropertySerializer.Meta):
+        fields = PropertySerializer.Meta.fields + (
+            'companyName',
+        )
+
+
 class ApplicationSerializer(serializers.ModelSerializer):
     companyId = serializers.UUIDField(source='company_id', required=False, allow_null=True)
     propertyId = serializers.UUIDField(source='property_id', required=False, allow_null=True)
