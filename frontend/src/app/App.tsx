@@ -1,5 +1,8 @@
 import { AppProvider, useApp } from '@/app/context/AppContext';
 import { LandingPage } from '@/app/components/LandingPage';
+import { CompaniesLanding } from '@/app/components/CompaniesLanding';
+import { CompanyLanding } from '@/app/components/CompanyLanding';
+import { PublicLandAcquisitionForm } from '@/app/components/PublicLandAcquisitionForm';
 import { Login } from '@/app/components/Login';
 import { Signup } from '@/app/components/Signup';
 import { CompanySelection } from '@/app/components/CompanySelection';
@@ -18,6 +21,9 @@ function AppContent() {
   return (
     <>
       {currentView === 'landing' && <LandingPage />}
+      {currentView === 'companies-landing' && <CompaniesLanding />}
+      {currentView === 'company-landing' && <CompanyLanding />}
+      {currentView === 'public-application' && <PublicLandAcquisitionForm />}
       {currentView === 'login' && <Login />}
       {currentView === 'signup' && <Signup />}
       {currentView === 'company-selection' && <CompanySelection />}

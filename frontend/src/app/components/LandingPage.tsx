@@ -1,10 +1,142 @@
-import { Building2, Users, ArrowRight, CheckCircle } from 'lucide-react';
+import { Building2, Users, ArrowRight, CheckCircle, MapPin, Square, DollarSign, Home, Sprout } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
+import { apiFetch } from '@/app/api';
 import { useApp } from '@/app/context/AppContext';
+import type { Property } from '@/app/types';
+import { useEffect, useMemo, useState } from 'react';
 
 export function LandingPage() {
-  const { setCurrentView } = useApp();
+  const { setCurrentView, setIntendedCompanyId, authToken, currentUser, setCurrentUser, refreshAll, hydrateFromApi, setCurrentCompany, setPublicCompanyId } = useApp();
+  const [inventories, setInventories] = useState<(Property & { companyName?: string })[]>([]);
+  const [isLoadingInventories, setIsLoadingInventories] = useState(false);
+
+  const [companyFilter, setCompanyFilter] = useState('all');
+  const [sizeFilter, setSizeFilter] = useState('all');
+  const [priceFilter, setPriceFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+
+  const companyOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        inventories
+          .map((p) => (p.companyName ?? '').trim())
+          .filter((v) => v.length > 0),
+      ),
+    ).sort((a, b) => a.localeCompare(b));
+  }, [inventories]);
+
+  const filteredInventories = useMemo(() => {
+    return inventories.filter((inv) => {
+      if (companyFilter !== 'all' && (inv.companyName ?? '') !== companyFilter) return false;
+
+      if (sizeFilter !== 'all') {
+        if (sizeFilter === 'small' && inv.size >= 2000) return false;
+        if (sizeFilter === 'medium' && (inv.size < 2000 || inv.size > 5000)) return false;
+        if (sizeFilter === 'large' && inv.size <= 5000) return false;
+      }
+
+      if (priceFilter !== 'all') {
+        if (priceFilter === 'under400' && inv.price >= 400) return false;
+        if (priceFilter === '400-800' && (inv.price < 400 || inv.price > 800)) return false;
+        if (priceFilter === 'over800' && inv.price <= 800) return false;
+      }
+
+      if (typeFilter !== 'all' && inv.type !== typeFilter) return false;
+
+      return true;
+    });
+  }, [inventories, companyFilter, sizeFilter, priceFilter, typeFilter]);
+
+  const clearFilters = () => {
+    setCompanyFilter('all');
+    setSizeFilter('all');
+    setPriceFilter('all');
+    setTypeFilter('all');
+  };
+
+  const getPropertyIcon = (type: string) => {
+    switch (type) {
+      case 'Residential':
+        return <Home className="h-5 w-5 text-blue-600" />;
+      case 'Commercial':
+        return <Building2 className="h-5 w-5 text-blue-600" />;
+      case 'Agricultural':
+        return <Sprout className="h-5 w-5 text-blue-600" />;
+      default:
+        return <Building2 className="h-5 w-5 text-blue-600" />;
+    }
+  };
+
+  const handleOpenCompanyLanding = (inv: Property & { companyName?: string }) => {
+    if (!inv.companyId) return;
+    setPublicCompanyId(inv.companyId);
+    setCurrentView('company-landing');
+  };
+
+  const handleApplyNow = (inv: Property & { companyName?: string }) => {
+    if (!inv.companyId) {
+      setCurrentView('login');
+      return;
+    }
+
+    if (!currentUser || !authToken) {
+      setIntendedCompanyId(inv.companyId);
+      setCurrentView('login');
+      return;
+    }
+
+    (async () => {
+      try {
+        if ((currentUser as any).role !== 'SuperAdmin') {
+          const updatedUser = await apiFetch('/api/auth/active-company/', {
+            token: authToken,
+            method: 'POST',
+            body: JSON.stringify({ companyId: inv.companyId }),
+          });
+
+          setCurrentUser(updatedUser as any);
+
+          const nextRole = (updatedUser as any)?.role as string | undefined;
+          const data = await refreshAll(authToken, { includeUsers: nextRole !== 'Client' });
+          hydrateFromApi(data);
+
+          const nextCompany = data.companies.find((c) => c.id === inv.companyId) ?? null;
+          setCurrentCompany(nextCompany);
+
+          if ((updatedUser as any).role === 'Admin') {
+            setCurrentView('admin');
+            return;
+          }
+
+          if ((updatedUser as any).role === 'Client') {
+            setCurrentView('client');
+            return;
+          }
+        }
+
+        setCurrentView('super-admin');
+      } catch {
+        setIntendedCompanyId(inv.companyId);
+        setCurrentView('login');
+      }
+    })();
+  };
+
+  useEffect(() => {
+    setIsLoadingInventories(true);
+    (async () => {
+      try {
+        const data = await apiFetch<(Property & { companyName?: string })[]>('/api/public/properties/');
+        setInventories(Array.isArray(data) ? data : []);
+      } catch {
+        setInventories([]);
+      } finally {
+        setIsLoadingInventories(false);
+      }
+    })();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50">
@@ -106,6 +238,160 @@ export function LandingPage() {
                 <p className="text-sm text-gray-600">Clients, admins, and super admins</p>
               </CardContent>
             </Card>
+          </div>
+
+          <div className="mt-16 text-left">
+            <div className="flex items-end justify-between gap-4 flex-wrap">
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900">Available Inventories</h3>
+                <p className="text-sm text-gray-600">Browse listings from all companies</p>
+              </div>
+              <Button variant="outline" onClick={() => setCurrentView('login')}>
+                Login to apply
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Filters</CardTitle>
+                  <CardDescription>Refine inventory search</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Company</label>
+                      <Select value={companyFilter} onValueChange={setCompanyFilter}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="All Companies" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Companies</SelectItem>
+                          {companyOptions.map((name) => (
+                            <SelectItem key={name} value={name}>
+                              {name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Plot Size</label>
+                      <Select value={sizeFilter} onValueChange={setSizeFilter}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="All Sizes" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Sizes</SelectItem>
+                          <SelectItem value="small">Small (&lt; 2,000 m²)</SelectItem>
+                          <SelectItem value="medium">Medium (2,000-5,000 m²)</SelectItem>
+                          <SelectItem value="large">Large (5,000+ m²)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Amount</label>
+                      <Select value={priceFilter} onValueChange={setPriceFilter}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="All Prices" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Prices</SelectItem>
+                          <SelectItem value="under400">Under D400K</SelectItem>
+                          <SelectItem value="400-800">D400K - D800K</SelectItem>
+                          <SelectItem value="over800">D800K+</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Type</label>
+                      <Select value={typeFilter} onValueChange={setTypeFilter}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="All Types" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Types</SelectItem>
+                          <SelectItem value="Residential">Residential</SelectItem>
+                          <SelectItem value="Commercial">Commercial</SelectItem>
+                          <SelectItem value="Agricultural">Agricultural</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="mt-6 flex items-center justify-between gap-4 flex-wrap">
+              <p className="text-sm text-gray-600">
+                Showing {filteredInventories.length} {filteredInventories.length === 1 ? 'inventory' : 'inventories'}
+              </p>
+              <Button variant="outline" onClick={clearFilters}>
+                Clear Filters
+              </Button>
+            </div>
+
+            <div className="mt-6">
+              {isLoadingInventories ? (
+                <div className="text-sm text-gray-600">Loading inventories...</div>
+              ) : inventories.length === 0 ? (
+                <div className="text-sm text-gray-600">No inventories available yet.</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredInventories.map((inv) => (
+                    <Card key={inv.id} className="overflow-hidden">
+                      <CardHeader>
+                        <div className="flex items-start justify-between gap-2">
+                          <CardTitle className="text-lg">{inv.title}</CardTitle>
+                          <div className="flex items-center gap-2">
+                            {getPropertyIcon(inv.type)}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleOpenCompanyLanding(inv)}
+                              aria-label="View company landing"
+                            >
+                              <ArrowRight className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        <CardDescription className="line-clamp-2">
+                          {inv.description}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <div className="text-sm text-gray-700 font-medium">{inv.companyName || 'Company'}</div>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <MapPin className="h-4 w-4" />
+                          <span>{inv.location}</span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="flex items-center gap-2 text-sm">
+                            <Square className="h-4 w-4 text-gray-500" />
+                            <span>{inv.size.toLocaleString()} m²</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <DollarSign className="h-4 w-4 text-gray-500" />
+                            <span>D{inv.price}K</span>
+                          </div>
+                        </div>
+
+                        <div className="pt-2">
+                          <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={() => handleApplyNow(inv)}>
+                            Apply Now
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

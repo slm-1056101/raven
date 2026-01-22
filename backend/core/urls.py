@@ -8,7 +8,9 @@ from .views import (
     CompanyViewSet,
     HealthView,
     MeView,
+    PublicApplicationsView,
     PublicCompaniesView,
+    PublicPropertiesView,
     PropertyViewSet,
     RavenTokenObtainPairView,
     SignupView,
@@ -29,5 +31,7 @@ urlpatterns = [
     path('auth/signup/', SignupView.as_view(), name='signup'),
     path('auth/active-company/', ActiveCompanyView.as_view(), name='active_company'),
     path('public/companies/', PublicCompaniesView.as_view(), name='public_companies'),
+    path('public/properties/', PublicPropertiesView.as_view(), name='public_properties'),
+    path('public/applications/', PublicApplicationsView.as_view(), name='public_applications'),
     path('', include(router.urls)),
 ]

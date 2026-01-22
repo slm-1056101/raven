@@ -8,14 +8,20 @@ interface AppContextType {
   applications: Application[];
   users: User[];
   companies: Company[];
-  currentView: 'landing' | 'login' | 'signup' | 'company-selection' | 'client' | 'admin' | 'super-admin';
+  currentView: 'landing' | 'companies-landing' | 'company-landing' | 'public-application' | 'login' | 'signup' | 'company-selection' | 'client' | 'admin' | 'super-admin';
   currentCompany: Company | null;
   currentUser: User | null;
   authToken: string | null;
-  setCurrentView: (view: 'landing' | 'login' | 'signup' | 'company-selection' | 'client' | 'admin' | 'super-admin') => void;
+  intendedCompanyId: string | null;
+  publicCompanyId: string | null;
+  publicProperty: Property | null;
+  setCurrentView: (view: 'landing' | 'companies-landing' | 'company-landing' | 'public-application' | 'login' | 'signup' | 'company-selection' | 'client' | 'admin' | 'super-admin') => void;
   setCurrentCompany: (company: Company | null) => void;
   setCurrentUser: (user: User | null) => void;
   setAuthToken: (token: string | null) => void;
+  setIntendedCompanyId: (companyId: string | null) => void;
+  setPublicCompanyId: (companyId: string | null) => void;
+  setPublicProperty: (property: Property | null) => void;
   refreshAll: (
     token: string,
     options?: { includeUsers?: boolean },
@@ -49,9 +55,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [applications, setApplications] = useState<Application[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [currentView, setCurrentView] = useState<'landing' | 'login' | 'signup' | 'company-selection' | 'client' | 'admin' | 'super-admin'>('landing');
+  const [currentView, setCurrentView] = useState<'landing' | 'companies-landing' | 'company-landing' | 'public-application' | 'login' | 'signup' | 'company-selection' | 'client' | 'admin' | 'super-admin'>('landing');
   const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [intendedCompanyId, setIntendedCompanyId] = useState<string | null>(null);
+  const [publicCompanyId, setPublicCompanyId] = useState<string | null>(null);
+  const [publicProperty, setPublicProperty] = useState<Property | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(() => {
     try {
       return localStorage.getItem('raven_auth_token');
@@ -293,10 +302,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
         currentCompany,
         currentUser,
         authToken,
+        intendedCompanyId,
+        publicCompanyId,
+        publicProperty,
         setCurrentView,
         setCurrentCompany,
         setCurrentUser,
         setAuthToken: setAuthTokenAndPersist,
+        setIntendedCompanyId,
+        setPublicCompanyId,
+        setPublicProperty,
         refreshAll,
         hydrateFromApi,
         logout,
