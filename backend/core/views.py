@@ -1,5 +1,7 @@
 from django.db.models import QuerySet
+from django.utils import timezone
 from rest_framework import viewsets
+from rest_framework import status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -158,7 +160,7 @@ class PublicPropertiesView(APIView):
     )
     def get(self, request):
         company_id = request.query_params.get('companyId')
-        qs = Property.objects.select_related('company').all()
+        qs = Property.objects.select_related('company').filter(deleted_at__isnull=True)
         if company_id:
             qs = qs.filter(company_id=company_id)
         properties = qs.order_by('-id')
@@ -277,8 +279,15 @@ class PropertyViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
     def get_queryset(self) -> QuerySet:
         tenant_company_id = self._tenant_company_id()
         if tenant_company_id:
-            return Property.objects.filter(company_id=tenant_company_id).order_by('-id')
-        return Property.objects.all().order_by('-id')
+            return Property.objects.filter(company_id=tenant_company_id, deleted_at__isnull=True).order_by('-id')
+        return Property.objects.filter(deleted_at__isnull=True).order_by('-id')
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if getattr(instance, 'deleted_at', None) is None:
+            instance.deleted_at = timezone.now()
+            instance.save(update_fields=['deleted_at'])
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def get_permissions(self):
         if self.action in ('list', 'retrieve'):

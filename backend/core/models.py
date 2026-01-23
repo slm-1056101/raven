@@ -140,6 +140,8 @@ class Property(models.Model):
     layout_image = models.FileField(upload_to='properties/layouts/', blank=True, null=True)
     features = models.JSONField(default=list, blank=True)
 
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
     def __str__(self) -> str:
         return self.title
 

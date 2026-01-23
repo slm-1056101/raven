@@ -287,7 +287,12 @@ class PropertySerializer(serializers.ModelSerializer):
         location = validated_data.get('location')
         if company_id and location and not validated_data.get('layout_image'):
             existing = (
-                Property.objects.filter(company_id=company_id, location=location, layout_image__isnull=False)
+                Property.objects.filter(
+                    company_id=company_id,
+                    location=location,
+                    layout_image__isnull=False,
+                    deleted_at__isnull=True,
+                )
                 .exclude(layout_image='')
                 .order_by('-id')
                 .first()
@@ -299,7 +304,11 @@ class PropertySerializer(serializers.ModelSerializer):
 
         # Overwrite all properties in the same company+location to share this uploaded/populated layout image.
         if instance.location and getattr(instance, 'layout_image', None):
-            Property.objects.filter(company_id=instance.company_id, location=instance.location).update(
+            Property.objects.filter(
+                company_id=instance.company_id,
+                location=instance.location,
+                deleted_at__isnull=True,
+            ).update(
                 layout_image=instance.layout_image
             )
 
@@ -312,7 +321,12 @@ class PropertySerializer(serializers.ModelSerializer):
         # If no layout is provided and this property has none, auto-populate from another property in same company+location.
         if location and not validated_data.get('layout_image') and not getattr(instance, 'layout_image', None):
             existing = (
-                Property.objects.filter(company_id=instance.company_id, location=location, layout_image__isnull=False)
+                Property.objects.filter(
+                    company_id=instance.company_id,
+                    location=location,
+                    layout_image__isnull=False,
+                    deleted_at__isnull=True,
+                )
                 .exclude(id=instance.id)
                 .exclude(layout_image='')
                 .order_by('-id')
@@ -325,7 +339,11 @@ class PropertySerializer(serializers.ModelSerializer):
 
         # If a layout exists after update, overwrite all properties in same company+location to share it.
         if updated.location and getattr(updated, 'layout_image', None):
-            Property.objects.filter(company_id=updated.company_id, location=updated.location).update(
+            Property.objects.filter(
+                company_id=updated.company_id,
+                location=updated.location,
+                deleted_at__isnull=True,
+            ).update(
                 layout_image=updated.layout_image
             )
 
