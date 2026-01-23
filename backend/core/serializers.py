@@ -222,9 +222,24 @@ class PropertySerializer(serializers.ModelSerializer):
     roomNumber = serializers.CharField(source='room_number', required=False, allow_blank=True, allow_null=True)
     image = serializers.ImageField(required=False, allow_null=True, write_only=True)
     imageUrl = serializers.SerializerMethodField()
+    layoutImage = serializers.FileField(source='layout_image', required=False, allow_null=True, write_only=True)
+    layoutImageUrl = serializers.SerializerMethodField()
 
     def get_imageUrl(self, obj):
         image = getattr(obj, 'image', None)
+        if not image:
+            return ''
+        try:
+            url = image.url
+        except Exception:
+            return ''
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(url)
+        return url
+
+    def get_layoutImageUrl(self, obj):
+        image = getattr(obj, 'layout_image', None)
         if not image:
             return ''
         try:
@@ -252,6 +267,8 @@ class PropertySerializer(serializers.ModelSerializer):
             'type',
             'image',
             'imageUrl',
+            'layoutImage',
+            'layoutImageUrl',
             'features',
         )
 
@@ -264,7 +281,55 @@ class PropertySerializer(serializers.ModelSerializer):
             if isinstance(max_plots, int) and max_plots >= 0 and current_count >= max_plots:
                 raise ValidationError({'detail': f"Subscription limit reached: maxPlots={max_plots}. Upgrade plan to add more plots."})
             validated_data['company'] = company
-        return super().create(validated_data)
+
+        # Per-company shared layout image by location:
+        # If no layout image is uploaded, try to auto-populate from another property in the same company+location.
+        location = validated_data.get('location')
+        if company_id and location and not validated_data.get('layout_image'):
+            existing = (
+                Property.objects.filter(company_id=company_id, location=location, layout_image__isnull=False)
+                .exclude(layout_image='')
+                .order_by('-id')
+                .first()
+            )
+            if existing and getattr(existing, 'layout_image', None):
+                validated_data['layout_image'] = existing.layout_image
+
+        instance = super().create(validated_data)
+
+        # Overwrite all properties in the same company+location to share this uploaded/populated layout image.
+        if instance.location and getattr(instance, 'layout_image', None):
+            Property.objects.filter(company_id=instance.company_id, location=instance.location).update(
+                layout_image=instance.layout_image
+            )
+
+        return instance
+
+    def update(self, instance, validated_data):
+        # Track target location post-update (location could be patched).
+        location = validated_data.get('location', instance.location)
+
+        # If no layout is provided and this property has none, auto-populate from another property in same company+location.
+        if location and not validated_data.get('layout_image') and not getattr(instance, 'layout_image', None):
+            existing = (
+                Property.objects.filter(company_id=instance.company_id, location=location, layout_image__isnull=False)
+                .exclude(id=instance.id)
+                .exclude(layout_image='')
+                .order_by('-id')
+                .first()
+            )
+            if existing and getattr(existing, 'layout_image', None):
+                validated_data['layout_image'] = existing.layout_image
+
+        updated = super().update(instance, validated_data)
+
+        # If a layout exists after update, overwrite all properties in same company+location to share it.
+        if updated.location and getattr(updated, 'layout_image', None):
+            Property.objects.filter(company_id=updated.company_id, location=updated.location).update(
+                layout_image=updated.layout_image
+            )
+
+        return updated
 
 
 class PublicPropertySerializer(PropertySerializer):

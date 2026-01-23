@@ -10,6 +10,7 @@ export interface Property {
   status: 'Available' | 'Reserved' | 'Sold';
   type: 'Residential' | 'Commercial' | 'Agricultural';
   imageUrl: string;
+  layoutImageUrl?: string;
   features: string[];
   companyId: string;
 }

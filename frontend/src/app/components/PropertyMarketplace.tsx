@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/app/components/ui/badge';
 import { useApp } from '@/app/context/AppContext';
 import { LandAcquisitionForm } from '@/app/components/LandAcquisitionForm';
+import { LayoutDocumentPreviewDialog } from '@/app/components/LayoutDocumentPreviewDialog';
 import type { Property } from '@/app/types';
 
 export function PropertyMarketplace() {
@@ -17,6 +18,10 @@ export function PropertyMarketplace() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [showApplicationForm, setShowApplicationForm] = useState(false);
+
+  const [layoutPreviewOpen, setLayoutPreviewOpen] = useState(false);
+  const [layoutPreviewUrl, setLayoutPreviewUrl] = useState<string | null>(null);
+  const [layoutPreviewTitle, setLayoutPreviewTitle] = useState('Layout Document');
 
   const locationOptions = Array.from(
     new Set(
@@ -96,7 +101,12 @@ export function PropertyMarketplace() {
   };
 
   if (showApplicationForm && selectedProperty) {
-    return <LandAcquisitionForm property={selectedProperty} onClose={handleFormClose} />;
+    return (
+      <LandAcquisitionForm
+        property={selectedProperty}
+        onClose={handleFormClose}
+      />
+    );
   }
 
   return (
@@ -226,6 +236,20 @@ export function PropertyMarketplace() {
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <MapPin className="h-4 w-4" />
                 <span>{property.location}</span>
+                {!!property.layoutImageUrl && (
+                  <button
+                    type="button"
+                    className="ml-auto text-xs text-blue-600 hover:underline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLayoutPreviewTitle('Layout Document');
+                      setLayoutPreviewUrl(property.layoutImageUrl || null);
+                      setLayoutPreviewOpen(true);
+                    }}
+                  >
+                    View layout
+                  </button>
+                )}
               </div>
 
               {(property.plotNumber || property.roomNumber) && (
@@ -278,6 +302,12 @@ export function PropertyMarketplace() {
           </Button>
         </div>
       )}
+      <LayoutDocumentPreviewDialog
+        open={layoutPreviewOpen}
+        onOpenChange={setLayoutPreviewOpen}
+        title={layoutPreviewTitle}
+        url={layoutPreviewUrl}
+      />
     </div>
   );
 }

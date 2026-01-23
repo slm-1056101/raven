@@ -1,9 +1,10 @@
-import { Building2, Users, ArrowRight, CheckCircle, MapPin, Square, DollarSign, Home, Sprout } from 'lucide-react';
+import { Building2, Users, CheckCircle, MapPin, Square, DollarSign, Home, Sprout } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
 import { apiFetch } from '@/app/api';
 import { useApp } from '@/app/context/AppContext';
+import { LayoutDocumentPreviewDialog } from '@/app/components/LayoutDocumentPreviewDialog';
 import type { Property } from '@/app/types';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -11,6 +12,10 @@ export function LandingPage() {
   const { setCurrentView, setIntendedCompanyId, authToken, currentUser, setCurrentUser, refreshAll, hydrateFromApi, setCurrentCompany, setPublicCompanyId } = useApp();
   const [inventories, setInventories] = useState<(Property & { companyName?: string })[]>([]);
   const [isLoadingInventories, setIsLoadingInventories] = useState(false);
+
+  const [layoutPreviewOpen, setLayoutPreviewOpen] = useState(false);
+  const [layoutPreviewUrl, setLayoutPreviewUrl] = useState<string | null>(null);
+  const [layoutPreviewTitle, setLayoutPreviewTitle] = useState('Layout Document');
 
   const [companyFilter, setCompanyFilter] = useState('all');
   const [sizeFilter, setSizeFilter] = useState('all');
@@ -160,7 +165,6 @@ export function LandingPage() {
                   onClick={() => setCurrentView('login')}
                 >
                   Access Portal
-                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </CardContent>
             </Card>
@@ -336,6 +340,20 @@ export function LandingPage() {
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                           <MapPin className="h-4 w-4" />
                           <span>{inv.location}</span>
+                          {!!inv.layoutImageUrl && (
+                            <button
+                              type="button"
+                              className="ml-auto text-xs text-blue-600 hover:underline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setLayoutPreviewTitle('Layout Document');
+                                setLayoutPreviewUrl(inv.layoutImageUrl || null);
+                                setLayoutPreviewOpen(true);
+                              }}
+                            >
+                              View layout
+                            </button>
+                          )}
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -361,6 +379,13 @@ export function LandingPage() {
           </div>
         </div>
       </div>
+
+      <LayoutDocumentPreviewDialog
+        open={layoutPreviewOpen}
+        onOpenChange={setLayoutPreviewOpen}
+        title={layoutPreviewTitle}
+        url={layoutPreviewUrl}
+      />
     </div>
   );
 }

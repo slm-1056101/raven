@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
 import { Textarea } from '@/app/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/app/components/ui/alert-dialog';
+import { LayoutDocumentPreviewDialog } from '@/app/components/LayoutDocumentPreviewDialog';
 import { useApp } from '@/app/context/AppContext';
 import { notifyError, notifySuccess } from '@/app/notify';
 
@@ -24,6 +25,11 @@ export function PropertyInventory() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [formData, setFormData] = useState<Partial<Property>>({});
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [layoutImageFile, setLayoutImageFile] = useState<File | null>(null);
+
+  const [layoutPreviewOpen, setLayoutPreviewOpen] = useState(false);
+  const [layoutPreviewUrl, setLayoutPreviewUrl] = useState<string | null>(null);
+  const [layoutPreviewTitle, setLayoutPreviewTitle] = useState('Layout Document');
 
   const filteredProperties = properties.filter((property) =>
     property.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -42,12 +48,14 @@ export function PropertyInventory() {
     setEditingProperty(property);
     setFormData(property);
     setImageFile(null);
+    setLayoutImageFile(null);
     setShowEditDialog(true);
   };
 
   const handleAddNew = () => {
     setEditingProperty(null);
     setImageFile(null);
+    setLayoutImageFile(null);
     setFormData({
       title: '',
       description: '',
@@ -90,15 +98,16 @@ export function PropertyInventory() {
           if (formData.type != null) fd.append('type', String(formData.type));
 
           if (imageFile) fd.append('image', imageFile);
+          if (layoutImageFile) fd.append('layoutImage', layoutImageFile);
           return fd;
         };
 
         if (editingProperty) {
-          const payload = imageFile ? (buildFormData() as any) : formData;
+          const payload = imageFile || layoutImageFile ? (buildFormData() as any) : formData;
           await updateProperty(authToken, editingProperty.id, payload);
           notifySuccess('Property updated successfully');
         } else {
-          const payload = imageFile
+          const payload = imageFile || layoutImageFile
             ? (buildFormData({ companyId: currentCompany.id }) as any)
             : {
                 ...formData,
@@ -240,9 +249,22 @@ export function PropertyInventory() {
                       <MapPin className="h-4 w-4 text-gray-400" />
                       <span>{property.location}</span>
                     </div>
+                    {!!property.layoutImageUrl && (
+                      <button
+                        type="button"
+                        className="text-xs text-blue-600 hover:underline"
+                        onClick={() => {
+                          setLayoutPreviewTitle('Layout Document');
+                          setLayoutPreviewUrl(property.layoutImageUrl || null);
+                          setLayoutPreviewOpen(true);
+                        }}
+                      >
+                        View layout
+                      </button>
+                    )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">{property.type}</Badge>
+                    <Badge variant="secondary">{property.type}</Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
@@ -250,9 +272,7 @@ export function PropertyInventory() {
                       <span>{property.size.toLocaleString()} m²</span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-medium">
-                    D{property.price.toLocaleString()}K
-                  </TableCell>
+                  <TableCell className="font-medium">D{property.price.toLocaleString()}K</TableCell>
                   <TableCell>
                     <Badge className={`${getStatusColor(property.status)} text-white`}>
                       {property.status}
@@ -416,6 +436,16 @@ export function PropertyInventory() {
                 onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
               />
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="layoutImage">Upload Layout Image</Label>
+              <Input
+                id="layoutImage"
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={(e) => setLayoutImageFile(e.target.files?.[0] ?? null)}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditDialog(false)}>
@@ -448,6 +478,13 @@ export function PropertyInventory() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <LayoutDocumentPreviewDialog
+        open={layoutPreviewOpen}
+        onOpenChange={setLayoutPreviewOpen}
+        title={layoutPreviewTitle}
+        url={layoutPreviewUrl}
+      />
     </div>
   );
 }

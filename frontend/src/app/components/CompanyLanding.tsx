@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/app/components/ui/badge';
 import { apiFetch } from '@/app/api';
 import { LandAcquisitionForm } from '@/app/components/LandAcquisitionForm';
+import { LayoutDocumentPreviewDialog } from '@/app/components/LayoutDocumentPreviewDialog';
 import { useApp } from '@/app/context/AppContext';
 import { notifyError } from '@/app/notify';
 
@@ -25,6 +26,10 @@ export function CompanyLanding() {
 
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [showApplicationForm, setShowApplicationForm] = useState(false);
+
+  const [layoutPreviewOpen, setLayoutPreviewOpen] = useState(false);
+  const [layoutPreviewUrl, setLayoutPreviewUrl] = useState<string | null>(null);
+  const [layoutPreviewTitle, setLayoutPreviewTitle] = useState('Layout Document');
 
   useEffect(() => {
     if (!publicCompanyId) {
@@ -290,6 +295,20 @@ export function CompanyLanding() {
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <MapPin className="h-4 w-4" />
                       <span>{property.location}</span>
+                      {!!property.layoutImageUrl && (
+                        <button
+                          type="button"
+                          className="ml-auto text-xs text-blue-600 hover:underline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLayoutPreviewTitle('Layout Document');
+                            setLayoutPreviewUrl(property.layoutImageUrl || null);
+                            setLayoutPreviewOpen(true);
+                          }}
+                        >
+                          View layout
+                        </button>
+                      )}
                     </div>
 
                     {(property.plotNumber || property.roomNumber) && (
@@ -344,6 +363,13 @@ export function CompanyLanding() {
           )}
         </div>
       </div>
+
+      <LayoutDocumentPreviewDialog
+        open={layoutPreviewOpen}
+        onOpenChange={setLayoutPreviewOpen}
+        title={layoutPreviewTitle}
+        url={layoutPreviewUrl}
+      />
     </div>
   );
 }

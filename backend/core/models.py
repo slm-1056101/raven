@@ -137,6 +137,7 @@ class Property(models.Model):
     type = models.CharField(max_length=16, choices=Type.choices, default=Type.RESIDENTIAL)
 
     image = models.ImageField(upload_to='properties/', blank=True, null=True)
+    layout_image = models.FileField(upload_to='properties/layouts/', blank=True, null=True)
     features = models.JSONField(default=list, blank=True)
 
     def __str__(self) -> str:
