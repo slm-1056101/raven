@@ -1,12 +1,23 @@
-FROM node:20-alpine
+# Build the application
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
 COPY package*.json ./
 
-# RUN npm ci --only=production
 RUN npm install
 
 COPY . .
 
-CMD ["npm", "run", "dev"]
+RUN npm run build
+
+
+# Production artifact
+FROM nginx:stable-alpine AS production
+
+COPY --from=build /app/build /usr/share/nginx/html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
+
