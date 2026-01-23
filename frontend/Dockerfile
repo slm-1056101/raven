@@ -1,5 +1,5 @@
 # Build the application
-FROM node:20-alpine AS build
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -13,9 +13,11 @@ RUN npm run build
 
 
 # Production artifact
-FROM nginx:stable-alpine AS production
+FROM nginx:stable-alpine
 
-COPY --from=build /app/build /usr/share/nginx/html
+RUN rm -rf /usr/share/nginx/html/*
+
+COPY --from=builder /app/build /usr/share/nginx/html
 
 EXPOSE 80
 
