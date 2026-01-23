@@ -42,6 +42,8 @@ npm run dev
 - **Swagger UI**: `http://localhost:8000/api/schema/swagger-ui/`
 - **OpenAPI schema**: `http://localhost:8000/api/schema/`
 - **Swagger Docs**: `http://localhost:8000/api/docs/`
+- **Frontend DEV**: `http://143.47.114.225:8080/`
+- **Swagger Docs DEV**: `http://143.47.114.225:8000/api/docs/`
 
 ## Environment Variables
 
