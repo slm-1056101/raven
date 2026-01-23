@@ -1,0 +1,32 @@
+name: Suwokono CI (Python + Node)
+
+on:
+  push:
+    branches: [ "main", "develop", "feature/*" ]
+  pull_request:
+    branches: [ "main", "develop", "feature/*" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # --------------------
+      # Build Suwokono Backend
+      # --------------------
+      - name: Build Suwokono Backend
+        run: |
+          docker build -t 534931273/suwokono-backend:v1.0.0 ./backend
+
+      # --------------------
+      # Build Suwokono Frontend
+      # --------------------
+      - name: Build Suwokono Frontend
+        run: |
+          docker build -t 534931273/suwokono-frontend:v1.0.0 ./frontend
