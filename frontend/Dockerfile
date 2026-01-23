@@ -15,11 +15,11 @@ RUN npm run build
 # Production artifact
 FROM nginx:stable-alpine
 
-RUN rm -rf /usr/share/nginx/html/*
+# Replace default config
+RUN rm /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 COPY --from=builder /app/dist /usr/share/nginx/html
-
-COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
