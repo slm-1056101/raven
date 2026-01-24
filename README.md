@@ -41,6 +41,9 @@ npm run dev
 - **API**: `http://localhost:8000/api/`
 - **Swagger UI**: `http://localhost:8000/api/schema/swagger-ui/`
 - **OpenAPI schema**: `http://localhost:8000/api/schema/`
+- **Swagger Docs**: `http://localhost:8000/api/docs/`
+- **Frontend DEV**: `http://143.47.114.225:8080/`
+- **Swagger Docs DEV**: `http://143.47.114.225:8000/api/docs/`
 
 ## Environment Variables
 
@@ -117,3 +120,4 @@ docker compose exec backend python manage.py seed_demo
 
 - If you add or change backend models, run Django migrations.
 - If you update Python dependencies, rebuild the backend image (`docker compose up --build`).
+
