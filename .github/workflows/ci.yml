@@ -1,10 +1,16 @@
 name: Suwokono CI (Python + Node)
-
 on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy'
+        required: true
+        default: 'main'
+        type: string
   push:
-    branches: [ "main", "develop", "feature/*" ]
+      branches: [ "main", "develop", "feature/*" ]
   pull_request:
-    branches: [ "main", "develop", "feature/*" ]
+      branches: [ "main", "develop", "feature/*" ]
 
 jobs:
   build:
