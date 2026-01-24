@@ -121,3 +121,4 @@ docker compose exec backend python manage.py seed_demo
 - If you add or change backend models, run Django migrations.
 - If you update Python dependencies, rebuild the backend image (`docker compose up --build`).
 
+
