@@ -251,7 +251,16 @@ class UserViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         user = self.request.user
         if getattr(user, 'role', None) == 'SuperAdmin':
             return User.objects.all().order_by('email')
-        return User.objects.filter(company_id=user.company_id).order_by('email')
+
+        tenant_company_id = self._tenant_company_id()
+        if not tenant_company_id:
+            return User.objects.none()
+
+        return (
+            User.objects.filter(company_id=tenant_company_id)
+            .exclude(role='SuperAdmin')
+            .order_by('email')
+        )
 
     def get_serializer_class(self):
         if self.action == 'create':
