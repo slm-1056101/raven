@@ -368,7 +368,7 @@ export function LandingPage() {
                         </div>
 
                         <div className="pt-2">
-                          <div className="text-xs text-gray-600">Click to view this company.</div>
+                          <div className="text-sm text-blue-600 text-center font-medium">View company</div>
                         </div>
                       </CardContent>
                     </Card>

@@ -84,6 +84,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+
 AUTH_USER_MODEL = 'core.User'
 
 CORS_ALLOWED_ORIGINS = [
