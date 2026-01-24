@@ -38,11 +38,11 @@ services:
     environment:
       VITE_API_PROXY_TARGET: http://suwokono-backend:8000
     ports:
-      - "8080:80"
+      - "80:80"
     depends_on:
       - suwokono-backend
     volumes:
-      - /home/opc/suwokono/conf/default.conf:/etc/nginx/conf.d/default.conf
+      # - /home/opc/suwokono/conf/default.conf:/etc/nginx/conf.d/default.conf
       - /home/opc/suwokono/media:/media:ro
 
 volumes:

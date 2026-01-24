@@ -44,6 +44,7 @@ npm run dev
 - **Swagger Docs**: `http://localhost:8000/api/docs/`
 - **Frontend DEV**: `http://143.47.114.225:8080/`
 - **Swagger Docs DEV**: `http://143.47.114.225:8000/api/docs/`
+- **Django Admin DEV**: `http://143.47.114.225:8000/admin`
 
 ## Environment Variables
 
