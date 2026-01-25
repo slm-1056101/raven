@@ -1,0 +1,16 @@
+
+
+1. Separate Property management from Rental management. 	- BB
+2. In Adding new property, use dimension (4 sides) instead of size. - BB
+3. In view layout, Should be able to preview pdf docs.	- BB
+	- Preview close button should be visible.	- BB
+4. In land application include account creation as the last step. Once you submit successfully, redirect to client landing page. - BC
+5. On client login, show my already applied properties as "Applied" - LS
+6. In Client Application details, Financing method shows "Undefined"	- LS
+7. Decouple client management from company admin functions	- LS ~ Done
+8. Company admin should predefine accepted payment methods.	- LS ~ Done
+9. Remove switch company from client portal.	- LS ~ Done
+10. Refactor Home page to include tabs at the top of the page (Land For Sale, Car Rentals, Property Rentals) - BC
+
+
+

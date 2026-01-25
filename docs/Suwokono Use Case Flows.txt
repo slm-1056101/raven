@@ -1,0 +1,332 @@
+📋 Suwokono Use Case Flows
+Detailed use case flows for Company Admin and Client roles:
+
+🏢 COMPANY ADMIN USE CASE FLOWS
+Role Overview
+Company Admins manage properties, review applications, and manage users within their company's scope.
+
+1. Initial Setup & Authentication
+Flow:
+
+Login via /api/auth/token/ with email and password
+Receive JWT tokens with role and company information
+Dashboard Access:
+
+Access Admin Dashboard with 4 main tabs:
+System Overview
+Property Inventory
+Application Review
+User Management
+
+
+2. Property Management (Inventory Tab)
+Core Capabilities:
+
+2.1 Create New Property
+Endpoint: POST /api/properties/
+Permissions: Admin
+Data Managed:
+Basic info: title, description, location
+Property type: Residential, Commercial, Agricultural
+Plot/Room numbers
+Pricing and dimension (4 sides)
+Status: Available, Reserved, Sold
+Property image (upload)
+Layout document (upload PDF/image)
+Features (JSON array)
+
+Flow:
+Click "Add Property" button
+Fill in property details form
+Upload property image and layout documents
+Add features/amenities
+Set initial status (typically "Available")
+Submit → Property is created in company's inventory
+
+2.2 Update/Edit Property
+Endpoint: PUT/PATCH /api/properties/{id}/
+
+Flow:
+View property list (filtered by company)
+Select property to edit
+Modify any fields (price, status, features, etc.)
+Upload new images/documents if needed
+Save changes
+
+2.3 Soft Delete Property
+Endpoint: DELETE /api/properties/{id}/
+Behavior: Sets deleted_at timestamp (soft delete)
+
+Flow:
+Select property from inventory
+Click delete/archive
+Property removed from active listings but retained in database
+
+2.4 View Property Inventory
+Endpoint: GET /api/properties/
+Display: All properties with status, pricing, applications count
+
+
+
+3. Application Review (Applications Tab)
+Core Capabilities:
+
+3.1 View All Applications
+Endpoint: GET /api/applications/
+Scope: All applications for company's properties
+Data Visible:
+Applicant information (name, email, phone, address)
+Property applied for
+Offer amount
+Financing method
+Intended use
+Application status: Pending, Approved, Rejected
+Uploaded documents (ID, proof of funds)
+Application date
+
+Flow:
+Access Applications tab
+View list of all applications (sorted by newest)
+Filter by status (Pending/Approved/Rejected)
+Filter by property
+
+3.2 Review & Approve/Reject Application
+Endpoint: PATCH /api/applications/{id}/
+Permissions: Admin
+
+Flow:
+Click on pending application
+Review applicant details:
+Personal information
+Offer amount vs property price
+Financial capability (proof of funds)
+Intended use
+Download and review uploaded documents:
+ID document
+Proof of funds
+Make decision:
+Approve: Update status to "Approved" → Property may be marked as "Reserved"
+Reject: Update status to "Rejected" with optional notes
+System updates application status
+
+3.3 Monitor Application Pipeline
+View metrics:
+Total applications (pending/approved/rejected)
+Conversion rates
+Average offer amounts
+Most popular properties
+
+
+
+4. User Management (Users Tab)
+Core Capabilities:
+
+4.1 Create New Users
+Endpoint: POST /api/users/
+Permissions: Admin (can create Admins for their company)
+
+Flow:
+Click "Add User"
+Enter user details:
+Name, email, phone
+Role: Admin or Client
+Assign to company (automatically set to admin's company)
+User receives credentials/invitation
+CompanyMembership record created
+
+
+4.3 Update User Information
+Endpoint: PATCH /api/users/{id}/
+Actions:
+Update profile information
+Change role (Admin ↔ Client)
+Activate/Deactivate users (Status: Active/Inactive)
+5. System Overview (Overview Tab)
+Capabilities:
+
+Company Statistics Dashboard:
+Total properties (by status: Available, Reserved, Sold)
+Total applications (by status)
+Total users (by role)
+Recent activity feed
+Revenue projections
+
+
+👤 CLIENT USE CASE FLOWS
+Role Overview
+Clients browse available properties and submit applications for land/property acquisition.
+
+1. Initial Setup & Authentication
+Two Entry Points:
+
+1.1 Public Signup (New Client)
+Endpoint: POST /api/auth/signup/
+No authentication required
+Flow:
+
+Navigate to signup page
+Enter personal information:
+Name, email, phone
+Password
+Submit → User created with role "Client"
+Receive JWT tokens automatically
+Redirected to Client Portal
+
+1.2 Login (Existing Client)
+Endpoint: POST /api/auth/token/
+Flow:
+Enter email and password
+Receive JWT with role="Client" and company_id
+Access Client Portal
+
+2. Browse Property Marketplace
+Primary Interface: Property Marketplace Tab
+
+2.1 View Available Properties
+Endpoint: GET /api/properties/ (filtered by client's active company)
+Public Endpoint: GET /api/public/properties/?company_id={id} (no auth required)
+Display:
+
+Property cards showing:
+Property image
+Title and description
+Location
+Plot/Room number
+dimension (4 sides) and Price
+Property type icon (Residential/Commercial/Agricultural)
+Status badge (Available/Reserved/Sold)
+Features/amenities tags
+"View layout" link (if layout document exists)
+
+2.2 Filter Properties
+Available Filters:
+
+Location: Dropdown of all locations in company's inventory
+Dimension: 
+Price Range: Under D400K, D400-800K, Over D800K
+Type: Residential, Commercial, Agricultural
+
+Flow:
+Browse property grid
+Apply filters to narrow search
+Clear filters to reset view
+
+2.3 View Property Details
+
+Flow:
+Click on property card
+View full details:
+Complete description
+High-resolution images
+Layout document preview (PDF/image)
+All features and amenities
+Exact measurements and pricing
+Click "Apply Now" button (only enabled if status = "Available")
+
+
+3. Submit Land/Property Application
+3.1 Application Form
+Endpoint: POST /api/applications/
+Permissions: Authenticated Client
+Flow:
+
+Click "Apply Now" on desired property
+Application form displays with:
+Pre-filled data (from user profile):
+Applicant name (from user.name)
+Applicant email (from user.email)
+Applicant phone
+Additional required fields:
+Address
+Offer amount (can differ from asking price)
+Financing method (Cash, Mortgage, Loan, etc.)
+Intended use (Residential, Investment, Commercial, etc.)
+Document uploads:
+ID Document (required)
+Proof of Funds (required)
+Additional documents (optional)
+Review application details
+Submit application
+Backend Process:
+
+Application created with:
+property_id: Selected property
+user_id: Client's user ID
+status: "Pending"
+date_applied: Current date
+Client redirected to "My Applications" tab
+
+
+4. Track Applications (My Applications Tab)
+4.1 View Application Status
+Endpoint: GET /api/applications/
+Scope: Applications created by the client for their active company
+Display:
+
+List of all submitted applications showing:
+Property details (image, title, location)
+Application date
+Status badge (Pending/Approved/Rejected)
+Offer amount
+Documents submitted
+Flow:
+
+Navigate to "My Applications" tab
+View all applications
+Filter by status if needed
+
+4.2 View Application Details
+Flow:
+
+Click on application card
+View complete application:
+All submitted information
+Uploaded documents (downloadable)
+Current status
+Admin notes (if any)
+Timeline/history
+4.3 Application Status Updates
+Client receives notification when:
+
+Application is Approved → Can proceed with next steps (payment, documentation)
+Application is Rejected → Can apply for other properties
+
+
+🔄 COMPLETE USER JOURNEY EXAMPLES
+
+Example 1: Client Applying for Property
+Discovery: Client logs in → sees Company landing page → selects company
+Browse: Views Property Marketplace → filters by location "Banjul" and type "Residential"
+Review: Clicks on property → views layout document → checks price (D500K)
+Apply: Clicks "Apply Now" → fills application form:
+Offer: D480K
+Financing: Mortgage
+Uploads ID and proof of funds
+Submit: Application created with status "Pending"
+Track: Views in "My Applications" tab
+Decision: Admin reviews → Approves application
+Notification: Client sees status changed to "Approved"
+
+Example 2: Admin Managing Property Lifecycle
+Create: Admin adds new property "Coastal Land Plot" with images and layout
+Publish: Sets status to "Available"
+Applications Received: 5 clients submit applications
+Review: Admin reviews each application in Applications tab
+Decision: Approves best offer (D520K vs asking D500K)
+Update Property: Changes property status to "Reserved"
+Finalize: After payment, changes status to "Sold"
+Archive: Eventually soft-deletes property from active listings
+
+
+🎯 KEY DIFFERENTIATORS
+Feature						Admin				   	Client
+Property Management				Create, Edit, Delete			View Only
+Application Review				Review, Approve, Reject	Submit, 	Track
+User Management					Create/Manage Users			View Own Profile
+Company Scope					Manage one company			None
+Document Access					All application documents		Own documents only
+Pricing Control					Set prices				Make offers
+
+
+
+This architecture provides a complete multi-tenant land/property management platform with clear separation of concerns between administrative functions and client-facing marketplace features. Would you like me to elaborate on any specific flow or create additional documentation?
