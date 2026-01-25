@@ -10,8 +10,7 @@ import { LayoutDocumentPreviewDialog } from '@/app/components/LayoutDocumentPrev
 import type { Property } from '@/app/types';
 
 export function PropertyMarketplace() {
-  const { getCompanyProperties, currentCompany } = useApp();
-  const properties = getCompanyProperties();
+  const { properties, applications, currentUser } = useApp();
   const [locationFilter, setLocationFilter] = useState('all');
   const [sizeFilter, setSizeFilter] = useState('all');
   const [priceFilter, setPriceFilter] = useState('all');
@@ -39,6 +38,16 @@ export function PropertyMarketplace() {
   const handleFormClose = () => {
     setShowApplicationForm(false);
     setSelectedProperty(null);
+  };
+
+  const hasApplied = (propertyId: string) => {
+    if (!currentUser) return false;
+    return applications.some((a) => {
+      if (a.propertyId !== propertyId) return false;
+      if (a.userId && a.userId === currentUser.id) return true;
+      if (a.applicantEmail && a.applicantEmail.toLowerCase() === currentUser.email.toLowerCase()) return true;
+      return false;
+    });
   };
 
   const filteredProperties = properties.filter((property) => {
@@ -282,13 +291,23 @@ export function PropertyMarketplace() {
 
             {/* Card Footer */}
             <CardFooter>
-              <Button 
-                className="w-full bg-blue-600 hover:bg-blue-700"
-                disabled={property.status !== 'Available'}
-                onClick={() => handleApplyNow(property)}
-              >
-                Apply Now
-              </Button>
+              {hasApplied(property.id) ? (
+                <Button className="w-full bg-gray-500 hover:bg-gray-500" disabled>
+                  Applied
+                </Button>
+              ) : (
+                <Button
+                  className={
+                    property.status === 'Available'
+                      ? 'w-full bg-blue-600 hover:bg-blue-700'
+                      : 'w-full bg-gray-500 hover:bg-gray-500'
+                  }
+                  disabled={property.status !== 'Available'}
+                  onClick={() => handleApplyNow(property)}
+                >
+                  Apply Now
+                </Button>
+              )}
             </CardFooter>
           </Card>
         ))}

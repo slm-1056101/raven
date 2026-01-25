@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Building2, UserPlus } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
@@ -7,7 +7,7 @@ import { Label } from '@/app/components/ui/label';
 import { notifyError, notifySuccess } from '@/app/notify';
 import { useApp } from '@/app/context/AppContext';
 import { apiFetch } from '@/app/api';
-import type { Company, User } from '@/app/types';
+import type { User } from '@/app/types';
 
 export function Signup() {
   const { setCurrentView, setAuthToken, setCurrentUser, hydrateFromApi, refreshAll } = useApp();
@@ -16,25 +16,7 @@ export function Signup() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [selectedCompanyIds, setSelectedCompanyIds] = useState<Record<string, boolean>>({});
-  const selectedIds = useMemo(() => Object.keys(selectedCompanyIds).filter((id) => selectedCompanyIds[id]), [selectedCompanyIds]);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const list = await apiFetch<Company[]>('/api/public/companies/');
-        setCompanies(list);
-      } catch (err: any) {
-        notifyError(err?.message || 'Failed to load companies');
-      }
-    })();
-  }, []);
-
-  const toggleCompany = (id: string) => {
-    setSelectedCompanyIds((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const handleSignup = async () => {
     const normalizedEmail = email.trim().toLowerCase();
@@ -50,8 +32,8 @@ export function Signup() {
       notifyError('Please enter your password');
       return;
     }
-    if (selectedIds.length === 0) {
-      notifyError('Please select at least one company');
+    if (password !== confirmPassword) {
+      notifyError('Passwords do not match');
       return;
     }
 
@@ -63,17 +45,16 @@ export function Signup() {
           email: normalizedEmail,
           phone: phone.trim(),
           password,
-          companyIds: selectedIds,
         }),
       });
 
       setAuthToken(resp.access);
 
       const me = await apiFetch<User>('/api/auth/me/', { token: resp.access });
-      const data = await refreshAll(resp.access, { includeUsers: me.role !== 'Client' });
+      const data = await refreshAll(resp.access, { includeUsers: me.role !== 'Client', role: me.role });
       hydrateFromApi(data);
 
-      setCurrentView('company-selection');
+      setCurrentView('client');
       notifySuccess('Account created');
     } catch (err: any) {
       notifyError(err?.message || 'Signup failed');
@@ -100,7 +81,7 @@ export function Signup() {
           <Card className="rounded-2xl shadow-lg">
             <CardHeader>
               <CardTitle>Sign up</CardTitle>
-              <CardDescription>Select one or more companies and create your account</CardDescription>
+              <CardDescription>Create your account</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -124,19 +105,8 @@ export function Signup() {
               </div>
 
               <div className="space-y-2">
-                <div className="text-sm font-medium">Companies</div>
-                <div className="space-y-2 max-h-56 overflow-auto rounded-lg border p-3">
-                  {companies.map((c) => (
-                    <label key={c.id} className="flex items-start gap-3 text-sm cursor-pointer">
-                      <input type="checkbox" checked={!!selectedCompanyIds[c.id]} onChange={() => toggleCompany(c.id)} />
-                      <div className="min-w-0">
-                        <div className="font-medium truncate">{c.name}</div>
-                        <div className="text-xs text-gray-600 truncate">{c.contactEmail}</div>
-                      </div>
-                    </label>
-                  ))}
-                  {companies.length === 0 && <div className="text-sm text-gray-600">No companies available</div>}
-                </div>
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Input id="confirmPassword" type="password" value={confirmPassword} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)} />
               </div>
 
               <Button className="w-full bg-blue-600 hover:bg-blue-700 gap-2" onClick={handleSignup}>

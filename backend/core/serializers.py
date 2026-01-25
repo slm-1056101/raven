@@ -1,8 +1,10 @@
 import datetime
+import json
 
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from django.db import transaction
+from django.http import QueryDict
 
 from .models import Application, Company, CompanyMembership, Property, User
 
@@ -139,7 +141,8 @@ class ClientSignupSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True, min_length=6)
     companyIds = serializers.ListField(
         child=serializers.UUIDField(),
-        allow_empty=False,
+        allow_empty=True,
+        required=False,
     )
 
     def validate_companyIds(self, value):
@@ -153,7 +156,7 @@ class ClientSignupSerializer(serializers.Serializer):
         email = self.validated_data['email'].lower()
         phone = self.validated_data.get('phone', '')
         password = self.validated_data['password']
-        company_ids = self.validated_data['companyIds']
+        company_ids = self.validated_data.get('companyIds') or []
 
         user = User.objects.filter(email=email).first()
 
@@ -176,13 +179,10 @@ class ClientSignupSerializer(serializers.Serializer):
                 status=User.Status.ACTIVE,
             )
 
-        companies = list(Company.objects.filter(id__in=company_ids))
-        for company in companies:
-            CompanyMembership.objects.get_or_create(user=user, company=company)
-
-        if not user.company_id and companies:
-            user.company = companies[0]
-            user.save(update_fields=['company'])
+        # Clients are platform-wide and are not linked to any single company.
+        # We intentionally do not create CompanyMembership links and do not set user.company.
+        user.company = None
+        user.save(update_fields=['company'])
 
         return user
 
@@ -220,10 +220,108 @@ class PropertySerializer(serializers.ModelSerializer):
     companyId = serializers.UUIDField(source='company_id', required=False, allow_null=True)
     plotNumber = serializers.CharField(source='plot_number', required=False, allow_blank=True, allow_null=True)
     roomNumber = serializers.CharField(source='room_number', required=False, allow_blank=True, allow_null=True)
+    financingMethods = serializers.JSONField(
+        source='financing_methods',
+        required=False,
+    )
     image = serializers.ImageField(required=False, allow_null=True, write_only=True)
     imageUrl = serializers.SerializerMethodField()
     layoutImage = serializers.FileField(source='layout_image', required=False, allow_null=True, write_only=True)
     layoutImageUrl = serializers.SerializerMethodField()
+
+    def to_internal_value(self, data):
+        is_querydict = isinstance(data, QueryDict)
+        if is_querydict:
+            data = data.copy()
+        elif not isinstance(data, dict):
+            data = dict(data)
+
+        raw = data.get('financingMethods')
+
+        def coerce_string_list(value):
+            if value is None:
+                return None
+
+            # If a single value arrives, allow treating it as a one-item list.
+            if isinstance(value, str):
+                # Often arrives as a JSON string when sent via multipart.
+                try:
+                    parsed = json.loads(value)
+                    if isinstance(parsed, list):
+                        return parsed
+                except Exception:
+                    pass
+                return [value]
+
+            if isinstance(value, dict):
+                try:
+                    items = list(value.items())
+                    items.sort(key=lambda kv: int(kv[0]) if str(kv[0]).isdigit() else str(kv[0]))
+                    ordered_values = [v for _, v in items]
+                except Exception:
+                    ordered_values = list(value.values())
+                return coerce_string_list(ordered_values)
+
+            if isinstance(value, (list, tuple)):
+                out = []
+                for item in value:
+                    if isinstance(item, str):
+                        # Sometimes we get a list of JSON strings.
+                        try:
+                            parsed = json.loads(item)
+                            if isinstance(parsed, list):
+                                out.extend(parsed)
+                                continue
+                        except Exception:
+                            pass
+                        out.append(item)
+                        continue
+                    if isinstance(item, (list, tuple, dict)):
+                        nested = coerce_string_list(item)
+                        if nested is not None:
+                            out.extend(nested)
+                        continue
+                    out.append(item)
+                return out
+
+            return value
+
+        coerced = coerce_string_list(raw)
+        if coerced is not None:
+            # When data is a QueryDict (multipart/form-data), assigning Python lists can
+            # get stringified in a non-JSON way. Keep it as a JSON string for JSONField.
+            if is_querydict:
+                try:
+                    data['financingMethods'] = json.dumps(coerced)
+                except Exception:
+                    data['financingMethods'] = coerced
+            else:
+                data['financingMethods'] = coerced
+
+        return super().to_internal_value(data)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        methods = attrs.get('financing_methods', None)
+
+        # financing_methods is required on create. On update, if provided, it cannot be emptied.
+        if getattr(self, 'instance', None) is None and methods is None:
+            raise ValidationError({'financingMethods': 'At least one financing method is required'})
+
+        if methods is None:
+            return attrs
+
+        if not isinstance(methods, list):
+            raise ValidationError({'financingMethods': 'Expected a list of strings'})
+
+        if len(methods) == 0:
+            raise ValidationError({'financingMethods': 'At least one financing method is required'})
+
+        for idx, m in enumerate(methods):
+            if not isinstance(m, str):
+                raise ValidationError({'financingMethods': {str(idx): ['Not a valid string.']}})
+
+        return attrs
 
     def get_imageUrl(self, obj):
         image = getattr(obj, 'image', None)
@@ -270,6 +368,7 @@ class PropertySerializer(serializers.ModelSerializer):
             'layoutImage',
             'layoutImageUrl',
             'features',
+            'financingMethods',
         )
 
     def create(self, validated_data):
@@ -373,6 +472,44 @@ class ApplicationSerializer(serializers.ModelSerializer):
     dateApplied = serializers.SerializerMethodField()
     idDocument = serializers.FileField(source='id_document', required=False, allow_null=True, write_only=True)
     proofOfFunds = serializers.FileField(source='proof_of_funds', required=False, allow_null=True, write_only=True)
+
+    def to_internal_value(self, data):
+        if isinstance(data, QueryDict):
+            data = data.copy()
+        elif not isinstance(data, dict):
+            data = dict(data)
+
+        if 'financing_method' in data and 'financingMethod' not in data:
+            data['financingMethod'] = data.get('financing_method')
+        if 'intended_use' in data and 'intendedUse' not in data:
+            data['intendedUse'] = data.get('intended_use')
+
+        # Some clients accidentally send the literal string 'undefined'/'null'.
+        # Treat these as empty so we don't persist bad values.
+        fm = data.get('financingMethod')
+        if isinstance(fm, str) and fm.strip().lower() in ('undefined', 'null'):
+            data['financingMethod'] = ''
+
+        return super().to_internal_value(data)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        property_obj = attrs.get('property')
+
+        # Require financing method on create.
+        if getattr(self, 'instance', None) is None:
+            fm = attrs.get('financing_method')
+            if not fm:
+                raise ValidationError({'financingMethod': 'Financing method is required'})
+
+        financing_method = attrs.get('financing_method')
+        if financing_method and property_obj is not None:
+            allowed = getattr(property_obj, 'financing_methods', None) or []
+            if isinstance(allowed, list) and len(allowed) > 0 and financing_method not in allowed:
+                raise ValidationError({'financingMethod': 'Selected financing method is not allowed for this property'})
+
+        return attrs
 
     def get_dateApplied(self, obj):
         value = getattr(obj, 'date_applied', None)

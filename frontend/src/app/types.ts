@@ -12,6 +12,7 @@ export interface Property {
   imageUrl: string;
   layoutImageUrl?: string;
   features: string[];
+  financingMethods?: string[];
   companyId: string;
 }
 

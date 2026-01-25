@@ -42,7 +42,7 @@ export function CompanySelection() {
       setCurrentUser(updatedUser as any);
 
       const nextRole = (updatedUser as any)?.role as string | undefined;
-      const data = await refreshAll(authToken, { includeUsers: nextRole !== 'Client' });
+      const data = await refreshAll(authToken, { includeUsers: nextRole !== 'Client', role: nextRole as any });
       hydrateFromApi(data);
 
       const activeCompany = data.companies.find((c) => c.id === company.id) ?? company;

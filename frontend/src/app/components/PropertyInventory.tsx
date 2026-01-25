@@ -16,6 +16,13 @@ import { notifyError, notifySuccess } from '@/app/notify';
 
 import type { Property } from '@/app/types';
 
+const FINANCING_METHOD_OPTIONS = [
+  'Cash Payment',
+  'Mortgage/Loan',
+  'Mixed (Cash + Loan)',
+  'Installment Plan',
+] as const;
+
 export function PropertyInventory() {
   const { getCompanyProperties, createProperty, updateProperty, deleteProperty, currentCompany, authToken } = useApp();
   const properties = getCompanyProperties();
@@ -67,6 +74,7 @@ export function PropertyInventory() {
       status: 'Available',
       type: 'Residential',
       features: [],
+      financingMethods: [],
     });
     setShowEditDialog(true);
   };
@@ -96,6 +104,10 @@ export function PropertyInventory() {
           if (formData.size != null) fd.append('size', String(formData.size));
           if (formData.status != null) fd.append('status', String(formData.status));
           if (formData.type != null) fd.append('type', String(formData.type));
+
+          if (formData.financingMethods != null) {
+            fd.append('financingMethods', JSON.stringify(formData.financingMethods));
+          }
 
           if (imageFile) fd.append('image', imageFile);
           if (layoutImageFile) fd.append('layoutImage', layoutImageFile);
@@ -425,6 +437,27 @@ export function PropertyInventory() {
                 onChange={(e) => setFormData({ ...formData, price: parseInt(e.target.value) || 0 })}
                 placeholder="0"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Allowed Financing Methods</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border p-3">
+                {FINANCING_METHOD_OPTIONS.map((m) => (
+                  <label key={m} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Array.isArray(formData.financingMethods) ? formData.financingMethods.includes(m) : false}
+                      onChange={() => {
+                        const current = Array.isArray(formData.financingMethods) ? formData.financingMethods : [];
+                        const next = current.includes(m) ? current.filter((x) => x !== m) : [...current, m];
+                        setFormData({ ...formData, financingMethods: next });
+                      }}
+                    />
+                    <span>{m}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-gray-600">If none selected, clients can choose any method.</p>
             </div>
 
             <div className="space-y-2">

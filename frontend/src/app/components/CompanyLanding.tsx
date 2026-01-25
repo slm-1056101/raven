@@ -161,7 +161,13 @@ export function CompanyLanding() {
   };
 
   if (showApplicationForm && selectedProperty) {
-    return <LandAcquisitionForm property={selectedProperty} onClose={handleFormClose} />;
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="container mx-auto px-4 py-8">
+          <LandAcquisitionForm property={selectedProperty} company={company} onClose={handleFormClose} />
+        </div>
+      </div>
+    );
   }
 
   return (
