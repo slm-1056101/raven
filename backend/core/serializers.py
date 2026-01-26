@@ -472,6 +472,8 @@ class ApplicationSerializer(serializers.ModelSerializer):
     dateApplied = serializers.SerializerMethodField()
     idDocument = serializers.FileField(source='id_document', required=False, allow_null=True, write_only=True)
     proofOfFunds = serializers.FileField(source='proof_of_funds', required=False, allow_null=True, write_only=True)
+    startDate = CoerceDateField(required=False, allow_null=True, write_only=True)
+    endDate = CoerceDateField(required=False, allow_null=True, write_only=True)
 
     def to_internal_value(self, data):
         if isinstance(data, QueryDict):
@@ -557,6 +559,8 @@ class ApplicationSerializer(serializers.ModelSerializer):
             'dateApplied',
             'idDocument',
             'proofOfFunds',
+            'startDate',
+            'endDate',
             'documents',
         )
         extra_kwargs = {
@@ -570,6 +574,9 @@ class ApplicationSerializer(serializers.ModelSerializer):
         property_id = validated_data.pop('property_id', None)
         user_id = validated_data.pop('user_id', None)
 
+        start_date = validated_data.pop('startDate', None)
+        end_date = validated_data.pop('endDate', None)
+
         id_doc = validated_data.get('id_document')
         pof = validated_data.get('proof_of_funds')
         if id_doc:
@@ -580,6 +587,14 @@ class ApplicationSerializer(serializers.ModelSerializer):
             validated_data.setdefault('documents', {})
             if isinstance(validated_data['documents'], dict):
                 validated_data['documents']['proofOfFundsName'] = getattr(pof, 'name', '')
+
+        if start_date or end_date:
+            validated_data.setdefault('documents', {})
+            if isinstance(validated_data['documents'], dict):
+                if start_date:
+                    validated_data['documents']['startDate'] = start_date.isoformat()
+                if end_date:
+                    validated_data['documents']['endDate'] = end_date.isoformat()
 
         if company_id:
             validated_data['company'] = Company.objects.get(id=company_id)

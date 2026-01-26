@@ -268,6 +268,32 @@ export function MyApplications() {
                 </div>
               </div>
 
+              {(selectedApplication.documents?.startDate || selectedApplication.documents?.endDate) && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Rental Period</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600">Start Date</p>
+                      <p className="font-medium">
+                        {selectedApplication.documents?.startDate
+                          ? format(new Date(selectedApplication.documents.startDate), 'MMM dd, yyyy')
+                          : '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">End Date</p>
+                      <p className="font-medium">
+                        {selectedApplication.documents?.endDate
+                          ? format(new Date(selectedApplication.documents.endDate), 'MMM dd, yyyy')
+                          : '—'}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               <Card>
                 <CardHeader>
                   <CardTitle>Property</CardTitle>

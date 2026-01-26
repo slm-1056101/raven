@@ -169,12 +169,12 @@ export function PropertyInventory() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold">Property Inventory</h2>
+          <h2 className="text-3xl font-bold">Inventory</h2>
           <p className="text-gray-600 mt-2">Manage your property listings</p>
         </div>
         <Button className="bg-blue-600 hover:bg-blue-700 gap-2" onClick={handleAddNew}>
           <Plus className="h-4 w-4" />
-          Add New Property
+          Add New Inventory
         </Button>
       </div>
 
@@ -320,7 +320,7 @@ export function PropertyInventory() {
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingProperty ? 'Edit Property' : 'Add New Property'}</DialogTitle>
+            <DialogTitle>{editingProperty ? 'Edit Inventory' : 'Add New Inventory'}</DialogTitle>
             <DialogDescription>
               {editingProperty ? 'Update property information' : 'Add a new property to the inventory'}
             </DialogDescription>
@@ -357,9 +357,12 @@ export function PropertyInventory() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Residential">Residential</SelectItem>
-                    <SelectItem value="Commercial">Commercial</SelectItem>
+                    <SelectItem value="Property Rentals">Property Rentals</SelectItem>
+                    <SelectItem value="Commercial Rentals">Commercial Rentals</SelectItem>
                     <SelectItem value="Agricultural">Agricultural</SelectItem>
+                    <SelectItem value="Land For Sale">Land For Sale</SelectItem>
+                    <SelectItem value="Car Rentals">Car Rentals</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

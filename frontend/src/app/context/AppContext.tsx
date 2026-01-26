@@ -3,12 +3,12 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import { apiFetch } from '@/app/api';
 import type { Application, Company, Property, User } from '@/app/types';
 
-interface AppContextType {
+ interface AppContextType {
   properties: Property[];
   applications: Application[];
   users: User[];
   companies: Company[];
-  currentView: 'landing' | 'companies-landing' | 'company-landing' | 'public-application' | 'login' | 'signup' | 'company-selection' | 'client' | 'admin' | 'super-admin';
+  currentView: 'landing' | 'companies-landing' | 'company-landing' | 'inventory-type' | 'public-application' | 'login' | 'signup' | 'company-selection' | 'client' | 'admin' | 'super-admin';
   currentCompany: Company | null;
   currentUser: User | null;
   authToken: string | null;
@@ -16,7 +16,8 @@ interface AppContextType {
   intendedCompanyName: string | null;
   publicCompanyId: string | null;
   publicProperty: Property | null;
-  setCurrentView: (view: 'landing' | 'companies-landing' | 'company-landing' | 'public-application' | 'login' | 'signup' | 'company-selection' | 'client' | 'admin' | 'super-admin') => void;
+  publicInventoryType: Property['type'] | null;
+  setCurrentView: (view: 'landing' | 'companies-landing' | 'company-landing' | 'inventory-type' | 'public-application' | 'login' | 'signup' | 'company-selection' | 'client' | 'admin' | 'super-admin') => void;
   setCurrentCompany: (company: Company | null) => void;
   setCurrentUser: (user: User | null) => void;
   setAuthToken: (token: string | null) => void;
@@ -24,6 +25,7 @@ interface AppContextType {
   setIntendedCompanyName: (companyName: string | null) => void;
   setPublicCompanyId: (companyId: string | null) => void;
   setPublicProperty: (property: Property | null) => void;
+  setPublicInventoryType: (type: Property['type'] | null) => void;
   refreshAll: (
     token: string,
     options?: { includeUsers?: boolean; role?: User['role'] },
@@ -57,13 +59,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [applications, setApplications] = useState<Application[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [currentView, setCurrentView] = useState<'landing' | 'companies-landing' | 'company-landing' | 'public-application' | 'login' | 'signup' | 'company-selection' | 'client' | 'admin' | 'super-admin'>('landing');
+  const [currentView, setCurrentView] = useState<'landing' | 'companies-landing' | 'company-landing' | 'inventory-type' | 'public-application' | 'login' | 'signup' | 'company-selection' | 'client' | 'admin' | 'super-admin'>('landing');
   const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [intendedCompanyId, setIntendedCompanyId] = useState<string | null>(null);
   const [intendedCompanyName, setIntendedCompanyName] = useState<string | null>(null);
   const [publicCompanyId, setPublicCompanyId] = useState<string | null>(null);
   const [publicProperty, setPublicProperty] = useState<Property | null>(null);
+  const [publicInventoryType, setPublicInventoryType] = useState<Property['type'] | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(() => {
     try {
       return localStorage.getItem('raven_auth_token');
@@ -326,6 +329,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         intendedCompanyName,
         publicCompanyId,
         publicProperty,
+        publicInventoryType,
         setCurrentView,
         setCurrentCompany,
         setCurrentUser,
@@ -334,6 +338,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setIntendedCompanyName,
         setPublicCompanyId,
         setPublicProperty,
+        setPublicInventoryType,
         refreshAll,
         hydrateFromApi,
         logout,

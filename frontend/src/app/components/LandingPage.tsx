@@ -1,17 +1,25 @@
-import { Building2, Users, CheckCircle, MapPin, Square, DollarSign, Home, Sprout } from 'lucide-react';
+import { Building2, Users, CheckCircle, MapPin, Square, DollarSign, Home, Sprout, Menu, Car, Landmark, Package } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/app/components/ui/dropdown-menu';
 import { apiFetch } from '@/app/api';
 import { useApp } from '@/app/context/AppContext';
 import { LayoutDocumentPreviewDialog } from '@/app/components/LayoutDocumentPreviewDialog';
 import type { Property } from '@/app/types';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 export function LandingPage() {
-  const { setCurrentView, setIntendedCompanyId, authToken, currentUser, setCurrentUser, refreshAll, hydrateFromApi, setCurrentCompany, setPublicCompanyId } = useApp();
+  const { setCurrentView, setIntendedCompanyId, authToken, currentUser, setCurrentUser, refreshAll, hydrateFromApi, setCurrentCompany, setPublicCompanyId, setPublicInventoryType } = useApp();
   const [inventories, setInventories] = useState<(Property & { companyName?: string })[]>([]);
   const [isLoadingInventories, setIsLoadingInventories] = useState(false);
+
+  const inventoriesAnchorRef = useRef<HTMLDivElement | null>(null);
 
   const [layoutPreviewOpen, setLayoutPreviewOpen] = useState(false);
   const [layoutPreviewUrl, setLayoutPreviewUrl] = useState<string | null>(null);
@@ -54,6 +62,17 @@ export function LandingPage() {
     });
   }, [inventories, companyFilter, sizeFilter, priceFilter, typeFilter]);
 
+  const inventoryTypes = useMemo(() => {
+    return [
+      'Property Rentals',
+      'Commercial Rentals',
+      'Agricultural',
+      'Land For Sale',
+      'Car Rentals',
+      'Other',
+    ] as const;
+  }, []);
+
   const clearFilters = () => {
     setCompanyFilter('all');
     setSizeFilter('all');
@@ -63,14 +82,37 @@ export function LandingPage() {
 
   const getPropertyIcon = (type: string) => {
     switch (type) {
-      case 'Residential':
+      case 'Property Rentals':
+      case 'Land For Sale':
         return <Home className="h-5 w-5 text-blue-600" />;
-      case 'Commercial':
+      case 'Commercial Rentals':
         return <Building2 className="h-5 w-5 text-blue-600" />;
       case 'Agricultural':
         return <Sprout className="h-5 w-5 text-blue-600" />;
+      case 'Car Rentals':
+        return <Building2 className="h-5 w-5 text-blue-600" />;
+      case 'Other':
+        return <Building2 className="h-5 w-5 text-blue-600" />;
       default:
         return <Building2 className="h-5 w-5 text-blue-600" />;
+    }
+  };
+
+  const getTypeTabIcon = (type: Property['type']) => {
+    switch (type) {
+      case 'Property Rentals':
+        return <Home className="h-4 w-4" />;
+      case 'Commercial Rentals':
+        return <Building2 className="h-4 w-4" />;
+      case 'Agricultural':
+        return <Sprout className="h-4 w-4" />;
+      case 'Land For Sale':
+        return <Landmark className="h-4 w-4" />;
+      case 'Car Rentals':
+        return <Car className="h-4 w-4" />;
+      case 'Other':
+      default:
+        return <Package className="h-4 w-4" />;
     }
   };
 
@@ -78,6 +120,11 @@ export function LandingPage() {
     if (!inv.companyId) return;
     setPublicCompanyId(inv.companyId);
     setCurrentView('company-landing');
+  };
+
+  const handleSelectTypeFromHeader = (type: Property['type']) => {
+    setPublicInventoryType(type);
+    setCurrentView('inventory-type');
   };
 
   useEffect(() => {
@@ -105,12 +152,65 @@ export function LandingPage() {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white border-b">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-3">
-            <Building2 className="h-8 w-8 text-blue-600" />
-            <div>
-              <h1 className="text-2xl font-bold">Suwokono</h1>
-              <p className="text-sm text-gray-600">Multi-Tenant Property Management Platform</p>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Building2 className="h-8 w-8 text-blue-600" />
+              <div>
+                <h1 className="text-2xl font-bold">Sukonowo</h1>
+                <p className="text-sm text-gray-600">Multi-Tenant Property Management Platform</p>
+              </div>
             </div>
+
+            <nav className="hidden md:flex items-center gap-1 flex-1 justify-center overflow-x-auto">
+              {inventoryTypes.map((t) => {
+                const hasItems = inventories.some((inv) => inv.type === t);
+                if (!hasItems) return null;
+
+                return (
+                  <Button
+                    key={t}
+                    variant="ghost"
+                    size="sm"
+                    className="whitespace-nowrap text-base gap-2"
+                    onClick={() => handleSelectTypeFromHeader(t)}
+                  >
+                    {getTypeTabIcon(t)}
+                    {t}
+                  </Button>
+                );
+              })}
+            </nav>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Access portal">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="bg-white text-gray-900 border border-gray-200 shadow-lg"
+              >
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    setCurrentView('login');
+                  }}
+                >
+                  Login
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    setCurrentView('signup');
+                  }}
+                >
+                  Create client account
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
@@ -119,56 +219,12 @@ export function LandingPage() {
       <div className="container mx-auto px-4 py-16">
         <div className="max-w-4xl mx-auto text-center space-y-6">
           <h2 className="text-5xl font-bold text-gray-900">
-            Welcome to Suwokono
+            Welcome to Sukonowo
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Your comprehensive multi-tenant platform for managing vacant land acquisitions, applications, 
             and property inventory across multiple real estate companies.
           </p>
-
-          {/* Role Selection Cards */}
-          <div className="grid gap-8 mt-12 max-w-xl mx-auto">
-            {/* Access Portal Card */}
-            <Card className="rounded-2xl shadow-lg hover:shadow-xl transition-shadow cursor-pointer group">
-              <CardHeader className="space-y-4">
-                <div className="mx-auto w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Users className="h-10 w-10 text-blue-600" />
-                </div>
-                <CardTitle className="text-2xl">Access Portal</CardTitle>
-                <CardDescription className="text-base">
-                  Login to access your company portal
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-3 text-left">
-                  <div className="flex items-start gap-2">
-                    <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-gray-700">
-                      Property marketplace with advanced filters
-                    </span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-gray-700">
-                      Multi-step application process
-                    </span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-gray-700">
-                      Real-time application tracking
-                    </span>
-                  </div>
-                </div>
-                <Button 
-                  className="w-full h-12 bg-blue-600 hover:bg-blue-700"
-                  onClick={() => setCurrentView('login')}
-                >
-                  Access Portal
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
 
           {/* Features Grid */}
           <div className="grid md:grid-cols-3 gap-6 mt-16">
@@ -202,6 +258,7 @@ export function LandingPage() {
           </div>
 
           <div className="mt-16 text-left">
+            <div ref={inventoriesAnchorRef} />
             <div className="flex items-end justify-between gap-4 flex-wrap">
               <div>
                 <h3 className="text-2xl font-bold text-gray-900">Available Inventories</h3>
@@ -272,9 +329,12 @@ export function LandingPage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Types</SelectItem>
-                          <SelectItem value="Residential">Residential</SelectItem>
-                          <SelectItem value="Commercial">Commercial</SelectItem>
+                          <SelectItem value="Property Rentals">Property Rentals</SelectItem>
+                          <SelectItem value="Commercial Rentals">Commercial Rentals</SelectItem>
                           <SelectItem value="Agricultural">Agricultural</SelectItem>
+                          <SelectItem value="Land For Sale">Land For Sale</SelectItem>
+                          <SelectItem value="Car Rentals">Car Rentals</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

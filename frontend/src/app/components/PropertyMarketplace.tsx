@@ -10,7 +10,7 @@ import { LayoutDocumentPreviewDialog } from '@/app/components/LayoutDocumentPrev
 import type { Property } from '@/app/types';
 
 export function PropertyMarketplace() {
-  const { properties, applications, currentUser } = useApp();
+  const { properties, applications, currentUser, setPublicCompanyId, setPublicProperty, setCurrentView } = useApp();
   const [locationFilter, setLocationFilter] = useState('all');
   const [sizeFilter, setSizeFilter] = useState('all');
   const [priceFilter, setPriceFilter] = useState('all');
@@ -31,6 +31,18 @@ export function PropertyMarketplace() {
   ).sort((a, b) => a.localeCompare(b));
 
   const handleApplyNow = (property: Property) => {
+    const isRentalType =
+      property.type === 'Property Rentals' ||
+      property.type === 'Commercial Rentals' ||
+      property.type === 'Car Rentals';
+
+    if (isRentalType) {
+      setPublicCompanyId(property.companyId);
+      setPublicProperty(property);
+      setCurrentView('public-application');
+      return;
+    }
+
     setSelectedProperty(property);
     setShowApplicationForm(true);
   };
@@ -85,12 +97,17 @@ export function PropertyMarketplace() {
 
   const getPropertyIcon = (type: string) => {
     switch (type) {
-      case 'Residential':
+      case 'Property Rentals':
+      case 'Land For Sale':
         return <Home className="h-5 w-5 text-blue-600" />;
-      case 'Commercial':
+      case 'Commercial Rentals':
         return <Building2 className="h-5 w-5 text-blue-600" />;
       case 'Agricultural':
         return <Sprout className="h-5 w-5 text-blue-600" />;
+      case 'Car Rentals':
+        return <Building2 className="h-5 w-5 text-blue-600" />;
+      case 'Other':
+        return <Building2 className="h-5 w-5 text-blue-600" />;
       default:
         return <Building2 className="h-5 w-5 text-blue-600" />;
     }
@@ -193,9 +210,12 @@ export function PropertyMarketplace() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="Residential">Residential</SelectItem>
-                  <SelectItem value="Commercial">Commercial</SelectItem>
+                  <SelectItem value="Property Rentals">Property Rentals</SelectItem>
+                  <SelectItem value="Commercial Rentals">Commercial Rentals</SelectItem>
                   <SelectItem value="Agricultural">Agricultural</SelectItem>
+                  <SelectItem value="Land For Sale">Land For Sale</SelectItem>
+                  <SelectItem value="Car Rentals">Car Rentals</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>

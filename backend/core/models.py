@@ -115,9 +115,12 @@ class Property(models.Model):
         SOLD = 'Sold'
 
     class Type(models.TextChoices):
-        RESIDENTIAL = 'Residential'
-        COMMERCIAL = 'Commercial'
+        PROPERTY_RENTALS = 'Property Rentals'
+        COMMERCIAL_RENTALS = 'Commercial Rentals'
         AGRICULTURAL = 'Agricultural'
+        LAND_FOR_SALE = 'Land For Sale'
+        CAR_RENTALS = 'Car Rentals'
+        OTHER = 'Other'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
@@ -134,7 +137,7 @@ class Property(models.Model):
     size = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.AVAILABLE)
-    type = models.CharField(max_length=16, choices=Type.choices, default=Type.RESIDENTIAL)
+    type = models.CharField(max_length=64, choices=Type.choices, default=Type.LAND_FOR_SALE)
 
     image = models.ImageField(upload_to='properties/', blank=True, null=True)
     layout_image = models.FileField(upload_to='properties/layouts/', blank=True, null=True)

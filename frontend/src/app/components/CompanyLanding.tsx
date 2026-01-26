@@ -13,7 +13,7 @@ import { notifyError } from '@/app/notify';
 import type { Company, Property } from '@/app/types';
 
 export function CompanyLanding() {
-  const { publicCompanyId, setCurrentView, authToken, currentUser, setIntendedCompanyId, setIntendedCompanyName } = useApp();
+  const { publicCompanyId, setCurrentView, authToken, currentUser, setIntendedCompanyId, setIntendedCompanyName, setPublicProperty } = useApp();
 
   const [company, setCompany] = useState<Company | null>(null);
   const [properties, setProperties] = useState<Property[]>([]);
@@ -116,6 +116,17 @@ export function CompanyLanding() {
   const handleApplyNow = (property: Property) => {
     if (!publicCompanyId) {
       notifyError('Missing company');
+      return;
+    }
+
+    const isRentalType =
+      property.type === 'Property Rentals' ||
+      property.type === 'Commercial Rentals' ||
+      property.type === 'Car Rentals';
+
+    if (isRentalType) {
+      setPublicProperty(property);
+      setCurrentView('public-application');
       return;
     }
 

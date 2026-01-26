@@ -2,6 +2,8 @@ import { toast } from 'sonner';
 
 type NotifyLevel = 'success' | 'error' | 'info';
 
+const TOAST_DURATION_MS = 7000;
+
 function coerceMessage(value: unknown): string {
   if (typeof value === 'string') return value;
   if (value instanceof Error) return value.message;
@@ -18,16 +20,16 @@ export function notify(level: NotifyLevel, title: string, description?: string) 
   const desc = description ? coerceMessage(description) : undefined;
 
   if (level === 'success') {
-    toast.success(message, { description: desc, duration: 3500 });
+    toast.success(message, { description: desc, duration: TOAST_DURATION_MS });
     return;
   }
 
   if (level === 'info') {
-    toast(message, { description: desc, duration: 3500 });
+    toast(message, { description: desc, duration: TOAST_DURATION_MS });
     return;
   }
 
-  toast.error(message, { description: desc, duration: 4500 });
+  toast.error(message, { description: desc, duration: TOAST_DURATION_MS });
 }
 
 export function notifySuccess(title: string, description?: string) {
