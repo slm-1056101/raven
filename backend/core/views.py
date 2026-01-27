@@ -189,6 +189,45 @@ class PublicApplicationsView(APIView):
         return Response(ApplicationSerializer(application, context={'request': request}).data, status=201)
 
 
+class PublicApplicationPrecheckView(APIView):
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        summary='Public application precheck',
+        description=(
+            'Public endpoint to check if a client account exists for an email and whether that email has already '
+            'submitted an application for a given inventory (property).'
+        ),
+        responses={
+            200: OpenApiResponse(description='Precheck result'),
+            400: OpenApiResponse(description='Validation error'),
+        },
+    )
+    def get(self, request):
+        email = (request.query_params.get('email') or '').strip().lower()
+        property_id = request.query_params.get('propertyId')
+        company_id = request.query_params.get('companyId')
+
+        if not email:
+            return Response({'detail': 'email is required'}, status=400)
+        if not property_id:
+            return Response({'detail': 'propertyId is required'}, status=400)
+
+        user_exists = User.objects.filter(email__iexact=email).exists()
+
+        apps_qs = Application.objects.filter(property_id=property_id, applicant_email__iexact=email)
+        if company_id:
+            apps_qs = apps_qs.filter(company_id=company_id)
+        already_applied = apps_qs.exists()
+
+        return Response(
+            {
+                'userExists': user_exists,
+                'alreadyApplied': already_applied,
+            }
+        )
+
+
 class TenantScopedViewSetMixin:
     def _tenant_company_id(self):
         user = self.request.user

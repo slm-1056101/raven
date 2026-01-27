@@ -10,6 +10,7 @@ export interface Property {
   status: 'Available' | 'Reserved' | 'Sold';
   type: 'Property Rentals' | 'Commercial Rentals' | 'Agricultural' | 'Land For Sale' | 'Car Rentals' | 'Other';
   imageUrl: string;
+  imageUrls?: string[];
   layoutImageUrl?: string;
   features: string[];
   financingMethods?: string[];

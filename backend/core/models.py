@@ -151,6 +151,20 @@ class Property(models.Model):
         return self.title
 
 
+class PropertyImage(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='images')
+    image = models.ImageField(upload_to='properties/images/', blank=False, null=False)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['order', 'created_at']
+
+    def __str__(self) -> str:
+        return f"{self.property_id} - {self.image.name}"
+
+
 class Application(models.Model):
     class Status(models.TextChoices):
         PENDING = 'Pending'

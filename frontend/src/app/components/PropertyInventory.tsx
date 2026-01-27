@@ -16,12 +16,54 @@ import { notifyError, notifySuccess } from '@/app/notify';
 
 import type { Property } from '@/app/types';
 
-const FINANCING_METHOD_OPTIONS = [
-  'Cash Payment',
-  'Mortgage/Loan',
-  'Mixed (Cash + Loan)',
-  'Installment Plan',
-] as const;
+const PAYMENT_METHOD_OPTIONS_RENTALS = ['Cash', 'CreditCard', 'Wave'] as const;
+
+const PAYMENT_METHOD_OPTIONS_LAND = ['Cash', 'CreditCard', 'Wave', 'Installation', 'Mortgage'] as const;
+
+type ExtraFields = {
+  startDate?: string;
+  endDate?: string;
+  pickupTime?: string;
+  year?: string;
+  dimension?: string;
+};
+
+function readExtraFromFeatures(features: unknown): ExtraFields {
+  if (!Array.isArray(features)) return {};
+  const out: ExtraFields = {};
+  for (const item of features) {
+    if (typeof item !== 'string') continue;
+    const idx = item.indexOf(':');
+    if (idx <= 0) continue;
+    const key = item.slice(0, idx).trim().toLowerCase();
+    const value = item.slice(idx + 1).trim();
+    if (!value) continue;
+    if (key === 'start date') out.startDate = value;
+    if (key === 'end date') out.endDate = value;
+    if (key === 'pickup time') out.pickupTime = value;
+    if (key === 'year') out.year = value;
+    if (key === 'dimension') out.dimension = value;
+  }
+  return out;
+}
+
+function mergeExtraIntoFeatures(features: unknown, extra: ExtraFields): string[] {
+  const base = Array.isArray(features) ? features.filter((x) => typeof x === 'string') : [];
+  const shouldDrop = (key: string) => (line: string) => line.trim().toLowerCase().startsWith(`${key.toLowerCase()}:`);
+  let next = base
+    .filter((line) => !shouldDrop('Start Date')(line))
+    .filter((line) => !shouldDrop('End Date')(line))
+    .filter((line) => !shouldDrop('Pickup Time')(line))
+    .filter((line) => !shouldDrop('Year')(line))
+    .filter((line) => !shouldDrop('Dimension')(line));
+
+  if (extra.startDate) next = [...next, `Start Date: ${extra.startDate}`];
+  if (extra.endDate) next = [...next, `End Date: ${extra.endDate}`];
+  if (extra.pickupTime) next = [...next, `Pickup Time: ${extra.pickupTime}`];
+  if (extra.year) next = [...next, `Year: ${extra.year}`];
+  if (extra.dimension) next = [...next, `Dimension: ${extra.dimension}`];
+  return next;
+}
 
 export function PropertyInventory() {
   const { getCompanyProperties, createProperty, updateProperty, deleteProperty, currentCompany, authToken } = useApp();
@@ -31,7 +73,8 @@ export function PropertyInventory() {
   const [deletingPropertyId, setDeletingPropertyId] = useState<string | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [formData, setFormData] = useState<Partial<Property>>({});
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [extraFields, setExtraFields] = useState<ExtraFields>({});
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [layoutImageFile, setLayoutImageFile] = useState<File | null>(null);
 
   const [layoutPreviewOpen, setLayoutPreviewOpen] = useState(false);
@@ -54,15 +97,17 @@ export function PropertyInventory() {
   const handleEdit = (property: Property) => {
     setEditingProperty(property);
     setFormData(property);
-    setImageFile(null);
+    setExtraFields(readExtraFromFeatures((property as any)?.features));
+    setImageFiles([]);
     setLayoutImageFile(null);
     setShowEditDialog(true);
   };
 
   const handleAddNew = () => {
     setEditingProperty(null);
-    setImageFile(null);
+    setImageFiles([]);
     setLayoutImageFile(null);
+    setExtraFields({});
     setFormData({
       title: '',
       description: '',
@@ -72,7 +117,7 @@ export function PropertyInventory() {
       price: 0,
       size: 0,
       status: 'Available',
-      type: 'Residential',
+      type: 'Land For Sale',
       features: [],
       financingMethods: [],
     });
@@ -95,6 +140,9 @@ export function PropertyInventory() {
           const fd = new FormData();
           if (extra?.companyId) fd.append('companyId', extra.companyId);
 
+          const normalizedFeatures = mergeExtraIntoFeatures((formData as any).features, extraFields);
+          const normalizedStatus = formData.status;
+
           if (formData.title != null) fd.append('title', String(formData.title));
           if (formData.description != null) fd.append('description', String(formData.description));
           if (formData.location != null) fd.append('location', String(formData.location));
@@ -102,27 +150,37 @@ export function PropertyInventory() {
           if (formData.roomNumber != null) fd.append('roomNumber', String(formData.roomNumber));
           if (formData.price != null) fd.append('price', String(formData.price));
           if (formData.size != null) fd.append('size', String(formData.size));
-          if (formData.status != null) fd.append('status', String(formData.status));
+          if (normalizedStatus != null) fd.append('status', String(normalizedStatus));
           if (formData.type != null) fd.append('type', String(formData.type));
+
+          fd.append('features', JSON.stringify(normalizedFeatures));
 
           if (formData.financingMethods != null) {
             fd.append('financingMethods', JSON.stringify(formData.financingMethods));
           }
 
-          if (imageFile) fd.append('image', imageFile);
+          for (const f of imageFiles) {
+            fd.append('images', f);
+          }
           if (layoutImageFile) fd.append('layoutImage', layoutImageFile);
           return fd;
         };
 
         if (editingProperty) {
-          const payload = imageFile || layoutImageFile ? (buildFormData() as any) : formData;
+          const payload = imageFiles.length > 0 || layoutImageFile
+            ? (buildFormData() as any)
+            : {
+                ...formData,
+                features: mergeExtraIntoFeatures((formData as any).features, extraFields),
+              };
           await updateProperty(authToken, editingProperty.id, payload);
           notifySuccess('Property updated successfully');
         } else {
-          const payload = imageFile || layoutImageFile
+          const payload = imageFiles.length > 0 || layoutImageFile
             ? (buildFormData({ companyId: currentCompany.id }) as any)
             : {
                 ...formData,
+                features: mergeExtraIntoFeatures((formData as any).features, extraFields),
                 companyId: currentCompany.id,
               };
           await createProperty(authToken, payload);
@@ -234,7 +292,6 @@ export function PropertyInventory() {
                 <TableHead>Property</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Size</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
@@ -278,12 +335,6 @@ export function PropertyInventory() {
                   <TableCell>
                     <Badge variant="secondary">{property.type}</Badge>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Square className="h-4 w-4 text-gray-400" />
-                      <span>{property.size.toLocaleString()} m²</span>
-                    </div>
-                  </TableCell>
                   <TableCell className="font-medium">D{property.price.toLocaleString()}K</TableCell>
                   <TableCell>
                     <Badge className={`${getStatusColor(property.status)} text-white`}>
@@ -325,70 +376,153 @@ export function PropertyInventory() {
               {editingProperty ? 'Update property information' : 'Add a new property to the inventory'}
             </DialogDescription>
           </DialogHeader>
+          {(() => {
+            const type = formData.type as Property['type'] | undefined;
+            const isRentalType =
+              type === 'Property Rentals' || type === 'Commercial Rentals' || type === 'Car Rentals';
+            const isLandType = type === 'Land For Sale' || type === 'Agricultural';
+
+            const paymentOptions = isLandType ? PAYMENT_METHOD_OPTIONS_LAND : PAYMENT_METHOD_OPTIONS_RENTALS;
+
+            const statusOptions: Array<{ label: string; value: Property['status'] }> = (() => {
+              if (isRentalType) {
+                return [
+                  { label: 'Available', value: 'Available' },
+                  { label: 'Booked', value: 'Reserved' },
+                ];
+              }
+              if (type === 'Other') {
+                return [
+                  { label: 'Available', value: 'Available' },
+                  { label: 'Sold', value: 'Sold' },
+                ];
+              }
+              return [
+                { label: 'Available', value: 'Available' },
+                { label: 'Reserved', value: 'Reserved' },
+                { label: 'Sold', value: 'Sold' },
+              ];
+            })();
+
+            const showSize = type !== 'Car Rentals' && type !== 'Other';
+            const showPlotNumber = type === 'Land For Sale' || type === 'Agricultural';
+            const showRoomNumber = type === 'Commercial Rentals';
+            const showDimension = type === 'Land For Sale' || type === 'Agricultural';
+            const showStartEnd = isRentalType;
+            const showPickupTime = type === 'Car Rentals';
+            const showYear = type === 'Car Rentals';
+            const showLayoutImage = type === 'Commercial Rentals' || type === 'Land For Sale' || type === 'Agricultural';
+
+            const titleLabel = type === 'Car Rentals' ? 'Model' : 'Title';
+            const plotLabel = type === 'Agricultural' ? 'Plot Number' : 'Plot Number';
+            const roomLabel = type === 'Commercial Rentals' ? 'Suite' : 'Room Number';
+
+            return (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="title">Title</Label>
+              <Label htmlFor="type">Type</Label>
+              <Select
+                value={formData.type}
+                onValueChange={(value) => {
+                  const nextType = value as Property['type'];
+                  setFormData({
+                    ...formData,
+                    type: nextType,
+                    status:
+                      nextType === 'Property Rentals' ||
+                      nextType === 'Commercial Rentals' ||
+                      nextType === 'Car Rentals'
+                        ? 'Available'
+                        : formData.status,
+                  });
+                  setExtraFields((prev) => ({ ...prev }));
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Property Rentals">Property Rentals</SelectItem>
+                  <SelectItem value="Commercial Rentals">Commercial Rentals</SelectItem>
+                  <SelectItem value="Agricultural">Agricultural</SelectItem>
+                  <SelectItem value="Land For Sale">Land For Sale</SelectItem>
+                  <SelectItem value="Car Rentals">Car Rentals</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="title">{titleLabel}</Label>
               <Input
                 id="title"
                 value={formData.title || ''}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="Property title"
+                placeholder={type === 'Car Rentals' ? 'Car model' : 'Inventory title'}
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="location">Location</Label>
-                <Input
-                  id="location"
-                  value={formData.location || ''}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  placeholder="City, State"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="type">Type</Label>
-                <Select
-                  value={formData.type}
-                  onValueChange={(value) => setFormData({ ...formData, type: value as Property['type'] })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Property Rentals">Property Rentals</SelectItem>
-                    <SelectItem value="Commercial Rentals">Commercial Rentals</SelectItem>
-                    <SelectItem value="Agricultural">Agricultural</SelectItem>
-                    <SelectItem value="Land For Sale">Land For Sale</SelectItem>
-                    <SelectItem value="Car Rentals">Car Rentals</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="location">Location</Label>
+              <Input
+                id="location"
+                value={formData.location || ''}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                placeholder="City, State"
+              />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="plotNumber">Plot Number</Label>
-                <Input
-                  id="plotNumber"
-                  value={formData.plotNumber || ''}
-                  onChange={(e) => setFormData({ ...formData, plotNumber: e.target.value })}
-                  placeholder="Optional"
-                />
-              </div>
+            {(showPlotNumber || showRoomNumber || showDimension || showYear) && (
+              <div className="grid grid-cols-2 gap-4">
+                {showPlotNumber && (
+                  <div className="space-y-2">
+                    <Label htmlFor="plotNumber">{plotLabel}</Label>
+                    <Input
+                      id="plotNumber"
+                      value={formData.plotNumber || ''}
+                      onChange={(e) => setFormData({ ...formData, plotNumber: e.target.value })}
+                      placeholder="Plot number"
+                    />
+                  </div>
+                )}
 
-              <div className="space-y-2">
-                <Label htmlFor="roomNumber">Room Number</Label>
-                <Input
-                  id="roomNumber"
-                  value={formData.roomNumber || ''}
-                  onChange={(e) => setFormData({ ...formData, roomNumber: e.target.value })}
-                  placeholder="Optional"
-                />
+                {showRoomNumber && (
+                  <div className="space-y-2">
+                    <Label htmlFor="roomNumber">{roomLabel}</Label>
+                    <Input
+                      id="roomNumber"
+                      value={formData.roomNumber || ''}
+                      onChange={(e) => setFormData({ ...formData, roomNumber: e.target.value })}
+                      placeholder="Suite"
+                    />
+                  </div>
+                )}
+
+                {showDimension && (
+                  <div className="space-y-2">
+                    <Label htmlFor="dimension">Dimension</Label>
+                    <Input
+                      id="dimension"
+                      value={extraFields.dimension ?? ''}
+                      onChange={(e) => setExtraFields({ ...extraFields, dimension: e.target.value })}
+                      placeholder="e.g. 50x30"
+                    />
+                  </div>
+                )}
+
+                {showYear && (
+                  <div className="space-y-2">
+                    <Label htmlFor="year">Year</Label>
+                    <Input
+                      id="year"
+                      value={extraFields.year ?? ''}
+                      onChange={(e) => setExtraFields({ ...extraFields, year: e.target.value })}
+                      placeholder="e.g. 2020"
+                    />
+                  </div>
+                )}
               </div>
-            </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
@@ -412,24 +546,63 @@ export function PropertyInventory() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Available">Available</SelectItem>
-                    <SelectItem value="Reserved">Reserved</SelectItem>
-                    <SelectItem value="Sold">Sold</SelectItem>
+                    {statusOptions.map((o) => (
+                      <SelectItem key={o.label} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
 
+              {showSize && (
+                <div className="space-y-2">
+                  <Label htmlFor="size">Size (m²)</Label>
+                  <Input
+                    id="size"
+                    type="number"
+                    value={formData.size || ''}
+                    onChange={(e) => setFormData({ ...formData, size: parseInt(e.target.value) || 0 })}
+                    placeholder="0"
+                  />
+                </div>
+              )}
+            </div>
+
+            {showStartEnd && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="startDate">Start Date</Label>
+                  <Input
+                    id="startDate"
+                    type="date"
+                    value={extraFields.startDate ?? ''}
+                    onChange={(e) => setExtraFields({ ...extraFields, startDate: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="endDate">End Date</Label>
+                  <Input
+                    id="endDate"
+                    type="date"
+                    value={extraFields.endDate ?? ''}
+                    onChange={(e) => setExtraFields({ ...extraFields, endDate: e.target.value })}
+                  />
+                </div>
+              </div>
+            )}
+
+            {showPickupTime && (
               <div className="space-y-2">
-                <Label htmlFor="size">Size (m²)</Label>
+                <Label htmlFor="pickupTime">Pickup Time</Label>
                 <Input
-                  id="size"
-                  type="number"
-                  value={formData.size || ''}
-                  onChange={(e) => setFormData({ ...formData, size: parseInt(e.target.value) || 0 })}
-                  placeholder="0"
+                  id="pickupTime"
+                  value={extraFields.pickupTime ?? ''}
+                  onChange={(e) => setExtraFields({ ...extraFields, pickupTime: e.target.value })}
+                  placeholder="e.g. 10:00 AM"
                 />
               </div>
-            </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="price">Price (in thousands)</Label>
@@ -443,9 +616,9 @@ export function PropertyInventory() {
             </div>
 
             <div className="space-y-2">
-              <Label>Allowed Financing Methods</Label>
+              <Label>Payment Method</Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border p-3">
-                {FINANCING_METHOD_OPTIONS.map((m) => (
+                {paymentOptions.map((m) => (
                   <label key={m} className="flex items-center gap-2 text-sm cursor-pointer">
                     <input
                       type="checkbox"
@@ -460,29 +633,34 @@ export function PropertyInventory() {
                   </label>
                 ))}
               </div>
-              <p className="text-xs text-gray-600">If none selected, clients can choose any method.</p>
+              <p className="text-xs text-gray-600">Select the payment methods you accept.</p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="image">Upload Image</Label>
+              <Label htmlFor="images">Upload Images</Label>
               <Input
-                id="image"
+                id="images"
                 type="file"
                 accept="image/*"
-                onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+                multiple
+                onChange={(e) => setImageFiles(Array.from(e.target.files ?? []))}
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="layoutImage">Upload Layout Image</Label>
-              <Input
-                id="layoutImage"
-                type="file"
-                accept="image/*,application/pdf"
-                onChange={(e) => setLayoutImageFile(e.target.files?.[0] ?? null)}
-              />
-            </div>
+            {showLayoutImage && (
+              <div className="space-y-2">
+                <Label htmlFor="layoutImage">Upload Layout Image</Label>
+                <Input
+                  id="layoutImage"
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => setLayoutImageFile(e.target.files?.[0] ?? null)}
+                />
+              </div>
+            )}
           </div>
+            );
+          })()}
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditDialog(false)}>
               Cancel

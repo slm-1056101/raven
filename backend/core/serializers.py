@@ -3,10 +3,11 @@ import json
 
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from django.db import models
 from django.db import transaction
 from django.http import QueryDict
 
-from .models import Application, Company, CompanyMembership, Property, User
+from .models import Application, Company, CompanyMembership, Property, PropertyImage, User
 
 
 class CoerceDateField(serializers.DateField):
@@ -226,8 +227,40 @@ class PropertySerializer(serializers.ModelSerializer):
     )
     image = serializers.ImageField(required=False, allow_null=True, write_only=True)
     imageUrl = serializers.SerializerMethodField()
+    imageUrls = serializers.SerializerMethodField()
     layoutImage = serializers.FileField(source='layout_image', required=False, allow_null=True, write_only=True)
     layoutImageUrl = serializers.SerializerMethodField()
+
+    def _file_url(self, file_field):
+        if not file_field:
+            return ''
+        try:
+            url = file_field.url
+        except Exception:
+            return ''
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(url)
+        return url
+
+    def _incoming_images(self):
+        request = self.context.get('request')
+        if not request:
+            return []
+        files = getattr(request, 'FILES', None)
+        if not files:
+            return []
+        images = []
+        try:
+            images = files.getlist('images')
+        except Exception:
+            images = []
+        if not images:
+            try:
+                images = files.getlist('images[]')
+            except Exception:
+                images = []
+        return [f for f in images if f]
 
     def to_internal_value(self, data):
         is_querydict = isinstance(data, QueryDict)
@@ -325,16 +358,33 @@ class PropertySerializer(serializers.ModelSerializer):
 
     def get_imageUrl(self, obj):
         image = getattr(obj, 'image', None)
-        if not image:
-            return ''
+        if image:
+            return self._file_url(image)
+        first = getattr(obj, 'images', None)
         try:
-            url = image.url
+            first = obj.images.order_by('order', 'created_at').first()
         except Exception:
-            return ''
-        request = self.context.get('request')
-        if request:
-            return request.build_absolute_uri(url)
-        return url
+            first = None
+        if first and getattr(first, 'image', None):
+            return self._file_url(first.image)
+        return ''
+
+    def get_imageUrls(self, obj):
+        urls = []
+        # Prefer multi-image relation when present.
+        try:
+            for pi in obj.images.order_by('order', 'created_at').all():
+                u = self._file_url(getattr(pi, 'image', None))
+                if u:
+                    urls.append(u)
+        except Exception:
+            urls = []
+
+        # Backward compatible fallback to single image field.
+        single = self._file_url(getattr(obj, 'image', None))
+        if single and single not in urls:
+            urls.insert(0, single)
+        return urls
 
     def get_layoutImageUrl(self, obj):
         image = getattr(obj, 'layout_image', None)
@@ -365,6 +415,7 @@ class PropertySerializer(serializers.ModelSerializer):
             'type',
             'image',
             'imageUrl',
+            'imageUrls',
             'layoutImage',
             'layoutImageUrl',
             'features',
@@ -372,6 +423,10 @@ class PropertySerializer(serializers.ModelSerializer):
         )
 
     def create(self, validated_data):
+        incoming_images = self._incoming_images()
+        if incoming_images and not validated_data.get('image'):
+            validated_data['image'] = incoming_images[0]
+
         company_id = validated_data.pop('company_id', None)
         if company_id:
             company = Company.objects.get(id=company_id)
@@ -401,6 +456,10 @@ class PropertySerializer(serializers.ModelSerializer):
 
         instance = super().create(validated_data)
 
+        if incoming_images:
+            for idx, f in enumerate(incoming_images):
+                PropertyImage.objects.create(property=instance, image=f, order=idx)
+
         # Overwrite all properties in the same company+location to share this uploaded/populated layout image.
         if instance.location and getattr(instance, 'layout_image', None):
             Property.objects.filter(
@@ -414,6 +473,10 @@ class PropertySerializer(serializers.ModelSerializer):
         return instance
 
     def update(self, instance, validated_data):
+        incoming_images = self._incoming_images()
+        if incoming_images and not validated_data.get('image'):
+            validated_data['image'] = incoming_images[0]
+
         # Track target location post-update (location could be patched).
         location = validated_data.get('location', instance.location)
 
@@ -435,6 +498,14 @@ class PropertySerializer(serializers.ModelSerializer):
                 validated_data['layout_image'] = existing.layout_image
 
         updated = super().update(instance, validated_data)
+
+        if incoming_images:
+            current_max_order = (
+                PropertyImage.objects.filter(property=updated).aggregate(models.Max('order')).get('order__max')
+            )
+            base = int(current_max_order or 0)
+            for idx, f in enumerate(incoming_images):
+                PropertyImage.objects.create(property=updated, image=f, order=base + idx + 1)
 
         # If a layout exists after update, overwrite all properties in same company+location to share it.
         if updated.location and getattr(updated, 'layout_image', None):
@@ -463,6 +534,7 @@ class ApplicationSerializer(serializers.ModelSerializer):
     propertyId = serializers.UUIDField(source='property_id', required=False, allow_null=True)
     userId = serializers.UUIDField(source='user_id', required=False, allow_null=True)
     applicantName = serializers.CharField(source='applicant_name')
+    surname = serializers.CharField(required=False, allow_blank=True, write_only=True)
     applicantEmail = serializers.EmailField(source='applicant_email')
     applicantPhone = serializers.CharField(source='applicant_phone', required=False, allow_blank=True)
     applicantAddress = serializers.CharField(source='applicant_address', required=False, allow_blank=True)
@@ -474,6 +546,7 @@ class ApplicationSerializer(serializers.ModelSerializer):
     proofOfFunds = serializers.FileField(source='proof_of_funds', required=False, allow_null=True, write_only=True)
     startDate = CoerceDateField(required=False, allow_null=True, write_only=True)
     endDate = CoerceDateField(required=False, allow_null=True, write_only=True)
+    pickupTime = serializers.CharField(required=False, allow_blank=True, write_only=True)
 
     def to_internal_value(self, data):
         if isinstance(data, QueryDict):
@@ -549,6 +622,7 @@ class ApplicationSerializer(serializers.ModelSerializer):
             'propertyId',
             'userId',
             'applicantName',
+            'surname',
             'applicantEmail',
             'applicantPhone',
             'applicantAddress',
@@ -561,6 +635,7 @@ class ApplicationSerializer(serializers.ModelSerializer):
             'proofOfFunds',
             'startDate',
             'endDate',
+            'pickupTime',
             'documents',
         )
         extra_kwargs = {
@@ -574,8 +649,10 @@ class ApplicationSerializer(serializers.ModelSerializer):
         property_id = validated_data.pop('property_id', None)
         user_id = validated_data.pop('user_id', None)
 
+        surname = validated_data.pop('surname', None)
         start_date = validated_data.pop('startDate', None)
         end_date = validated_data.pop('endDate', None)
+        pickup_time = validated_data.pop('pickupTime', None)
 
         id_doc = validated_data.get('id_document')
         pof = validated_data.get('proof_of_funds')
@@ -595,6 +672,14 @@ class ApplicationSerializer(serializers.ModelSerializer):
                     validated_data['documents']['startDate'] = start_date.isoformat()
                 if end_date:
                     validated_data['documents']['endDate'] = end_date.isoformat()
+
+        if surname or pickup_time:
+            validated_data.setdefault('documents', {})
+            if isinstance(validated_data['documents'], dict):
+                if surname:
+                    validated_data['documents']['surname'] = str(surname)
+                if pickup_time:
+                    validated_data['documents']['pickupTime'] = str(pickup_time)
 
         if company_id:
             validated_data['company'] = Company.objects.get(id=company_id)

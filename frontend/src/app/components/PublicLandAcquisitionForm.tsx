@@ -10,12 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Progress } from '@/app/components/ui/progress';
 import { apiFetch } from '@/app/api';
 import { useApp } from '@/app/context/AppContext';
-import { notifyError, notifySuccess } from '@/app/notify';
+import { notifyError, notifyInfo, notifySuccess } from '@/app/notify';
 
 import type { Property } from '@/app/types';
 
 interface FormData {
   fullName: string;
+  surname: string;
   email: string;
   username: string;
   password: string;
@@ -26,15 +27,13 @@ interface FormData {
   financingMethod: string;
   startDate?: string;
   endDate?: string;
+  pickupTime?: string;
   idDocument: File | null;
-  proofOfFunds: File | null;
 }
 
 export function PublicLandAcquisitionForm() {
   const { publicProperty, publicCompanyId, setCurrentView, setIntendedCompanyId, currentUser, authToken, setAuthToken, setCurrentUser, hydrateFromApi, refreshAll, createApplication } = useApp();
   const [currentStep, setCurrentStep] = useState(1);
-  const [idDocumentFile, setIdDocumentFile] = useState<File | null>(null);
-  const [proofOfFundsFile, setProofOfFundsFile] = useState<File | null>(null);
 
   const property = publicProperty as Property | null;
 
@@ -44,11 +43,14 @@ export function PublicLandAcquisitionForm() {
     trigger,
     control,
     setValue,
+    setError,
+    clearErrors,
     formState: { errors },
   } = useForm<FormData>({
     shouldUnregister: false,
     defaultValues: {
       fullName: '',
+      surname: '',
       email: '',
       username: '',
       password: '',
@@ -59,6 +61,8 @@ export function PublicLandAcquisitionForm() {
       financingMethod: '',
       startDate: '',
       endDate: '',
+      pickupTime: '',
+      idDocument: null,
     },
   });
 
@@ -74,6 +78,8 @@ export function PublicLandAcquisitionForm() {
     property?.type === 'Property Rentals' ||
     property?.type === 'Commercial Rentals' ||
     property?.type === 'Car Rentals';
+
+  const isCarRental = property?.type === 'Car Rentals';
 
   useEffect(() => {
     if (!property) {
@@ -101,7 +107,7 @@ export function PublicLandAcquisitionForm() {
   const validateAndNext = async () => {
     let fields: (keyof FormData)[] = [];
     if (currentStep === 1) {
-      fields = ['fullName', 'username', 'phone', 'address'];
+      fields = ['fullName', 'surname', 'username', 'phone', 'address'];
       if (!currentUser) fields.push('password');
     }
     if (currentStep === 2) fields = ['intendedUse'];
@@ -135,11 +141,10 @@ export function PublicLandAcquisitionForm() {
     nextStep();
   };
 
-  const handleFileUpload = (e: ChangeEvent<HTMLInputElement>, type: 'id' | 'funds') => {
+  const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    if (type === 'id') setIdDocumentFile(file);
-    if (type === 'funds') setProofOfFundsFile(file);
+    setValue('idDocument', file ?? null, { shouldDirty: true, shouldValidate: false });
+    if (file) clearErrors('idDocument');
   };
 
   const onSubmit = async (data: FormData) => {
@@ -158,19 +163,14 @@ export function PublicLandAcquisitionForm() {
       return;
     }
 
-    if (!idDocumentFile) {
-      notifyError('ID Document is required');
-      return;
-    }
-
-    if (!proofOfFundsFile) {
-      notifyError('Proof of Funds is required');
+    if (!data.idDocument) {
+      setError('idDocument', { type: 'required', message: 'ID Document is required' });
       return;
     }
 
     const normalizedEmail = (currentUser?.email || data.username || data.email || '').trim().toLowerCase();
     if (!normalizedEmail) {
-      notifyError('Please enter your username');
+      notifyError('Please enter your email');
       return;
     }
 
@@ -190,10 +190,36 @@ export function PublicLandAcquisitionForm() {
       }
     }
 
+    if (isCarRental) {
+      if (!data.pickupTime) {
+        notifyError('Pickup time is required');
+        return;
+      }
+    }
+
     try {
+      const targetCompanyId = publicCompanyId || property.companyId;
+
+      const precheck = await apiFetch<{ userExists: boolean; alreadyApplied: boolean }>(
+        `/api/public/applications/precheck/?email=${encodeURIComponent(normalizedEmail)}&propertyId=${encodeURIComponent(
+          property.id,
+        )}&companyId=${encodeURIComponent(targetCompanyId)}`,
+      );
+
+      if (precheck.alreadyApplied) {
+        if (targetCompanyId) setIntendedCompanyId(targetCompanyId);
+        if (!currentUser) {
+          notifyInfo('Already applied for the inventory, please login to track progress');
+          setCurrentView('login');
+          return;
+        }
+        notifyInfo('Already applied for the inventory, please login to track progress');
+        return;
+      }
+
       let effectiveToken: string | null = null;
 
-      if (!currentUser) {
+      if (!currentUser && !precheck.userExists) {
         const resp = await apiFetch<{ access: string; refresh: string; user: any }>('/api/auth/signup/', {
           method: 'POST',
           body: JSON.stringify({
@@ -218,8 +244,9 @@ export function PublicLandAcquisitionForm() {
       const formData = new FormData();
 
       formData.append('propertyId', property.id);
-      formData.append('companyId', publicCompanyId || property.companyId);
+      formData.append('companyId', targetCompanyId);
       formData.append('applicantName', data.fullName);
+      if (data.surname) formData.append('surname', data.surname);
       formData.append('applicantEmail', normalizedEmail);
       formData.append('applicantPhone', data.phone);
       formData.append('applicantAddress', data.address);
@@ -232,11 +259,32 @@ export function PublicLandAcquisitionForm() {
         if (data.endDate) formData.append('endDate', data.endDate);
       }
 
-      if (idDocumentFile) formData.append('idDocument', idDocumentFile);
-      if (proofOfFundsFile) formData.append('proofOfFunds', proofOfFundsFile);
+      if (isCarRental && data.pickupTime) {
+        formData.append('pickupTime', data.pickupTime);
+      }
+
+      if (data.idDocument) formData.append('idDocument', data.idDocument);
 
       if (effectiveToken) {
-        await createApplication(effectiveToken, formData as any);
+        try {
+          await createApplication(effectiveToken, formData as any);
+        } catch {
+          await apiFetch('/api/applications/', {
+            token: effectiveToken,
+            method: 'POST',
+            body: formData,
+          });
+        }
+
+        try {
+          const all = await refreshAll(effectiveToken, {
+            includeUsers: false,
+            role: (currentUser?.role ?? 'Client') as any,
+          });
+          hydrateFromApi(all);
+        } catch {
+          // ignore
+        }
       } else {
         await apiFetch('/api/public/applications/', {
           method: 'POST',
@@ -244,14 +292,20 @@ export function PublicLandAcquisitionForm() {
         });
       }
 
-      notifySuccess('Application submitted');
-
-      if (publicCompanyId) {
-        setIntendedCompanyId(publicCompanyId);
-      } else if (property.companyId) {
-        setIntendedCompanyId(property.companyId);
+      if (targetCompanyId) {
+        setIntendedCompanyId(targetCompanyId);
       }
 
+      if (!currentUser && precheck.userExists) {
+        // Existing client -> send them to login after submitting.
+        notifySuccess('Application submitted, please login to track application');
+        setCurrentView('login');
+        return;
+      }
+
+      notifySuccess('Application submitted');
+
+      // New client (just signed up) OR existing logged-in user.
       setCurrentView('client');
     } catch (err: any) {
       notifyError(err?.message || 'Failed to submit application');
@@ -263,7 +317,7 @@ export function PublicLandAcquisitionForm() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50">
       <div className="container mx-auto px-4 py-12">
-        <div className="max-w-3xl mx-auto space-y-8">
+        <div className="max-w-6xl mx-auto space-y-8">
           <div className="text-center space-y-2">
             <h1 className="text-3xl font-bold">Application Form</h1>
             <p className="text-sm text-gray-600">
@@ -274,7 +328,9 @@ export function PublicLandAcquisitionForm() {
           <Card>
             <CardHeader>
               <CardTitle>Progress</CardTitle>
-              <CardDescription>Step {currentStep} of 4</CardDescription>
+              <CardDescription>
+                Step {currentStep} of 4 ({Math.round(progress)}%)
+              </CardDescription>
               <Progress value={progress} />
             </CardHeader>
             <CardContent>
@@ -321,8 +377,8 @@ export function PublicLandAcquisitionForm() {
                 {currentStep === 1 && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="fullName">Full Name</Label>
-                      <Input id="fullName" {...register('fullName', { required: 'Full name is required' })} />
+                      <Label htmlFor="fullName">Name</Label>
+                      <Input id="fullName" {...register('fullName', { required: 'Name is required' })} />
                       {errors.fullName && (
                         <div className="text-sm text-red-600 flex items-center gap-2">
                           <AlertCircle className="h-4 w-4" />
@@ -332,11 +388,22 @@ export function PublicLandAcquisitionForm() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="username">Username</Label>
+                      <Label htmlFor="surname">Surname</Label>
+                      <Input id="surname" {...register('surname', { required: 'Surname is required' })} />
+                      {errors.surname && (
+                        <div className="text-sm text-red-600 flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4" />
+                          {errors.surname.message}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="username">Email</Label>
                       <Input
                         id="username"
                         type="email"
-                        {...register('username', { required: currentUser ? false : 'Username is required' })}
+                        {...register('username', { required: currentUser ? false : 'Email is required' })}
                       />
                       {errors.username && (
                         <div className="text-sm text-red-600 flex items-center gap-2">
@@ -431,6 +498,23 @@ export function PublicLandAcquisitionForm() {
                       </div>
                     )}
 
+                    {isCarRental && (
+                      <div className="space-y-2">
+                        <Label htmlFor="pickupTime">Pickup Time</Label>
+                        <Input
+                          id="pickupTime"
+                          placeholder="e.g. 10:00 AM"
+                          {...register('pickupTime', { required: 'Pickup time is required' })}
+                        />
+                        {errors.pickupTime && (
+                          <div className="text-sm text-red-600 flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4" />
+                            {errors.pickupTime.message}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     <div className="space-y-2">
                       <Label htmlFor="intendedUse">Intended Use</Label>
                       <Textarea id="intendedUse" rows={4} {...register('intendedUse', { required: 'Intended use is required' })} />
@@ -473,10 +557,20 @@ export function PublicLandAcquisitionForm() {
                               <SelectValue placeholder="Select" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="Cash">Cash</SelectItem>
-                              <SelectItem value="Mortgage">Mortgage</SelectItem>
-                              <SelectItem value="Bank Loan">Bank Loan</SelectItem>
-                              <SelectItem value="Other">Other</SelectItem>
+                              {isRentalType ? (
+                                <>
+                                  <SelectItem value="Cash">Cash</SelectItem>
+                                  <SelectItem value="CreditCard">CreditCard</SelectItem>
+                                  <SelectItem value="Wave">Wave</SelectItem>
+                                </>
+                              ) : (
+                                <>
+                                  <SelectItem value="Cash">Cash</SelectItem>
+                                  <SelectItem value="Mortgage">Mortgage</SelectItem>
+                                  <SelectItem value="Bank Loan">Bank Loan</SelectItem>
+                                  <SelectItem value="Other">Other</SelectItem>
+                                </>
+                              )}
                             </SelectContent>
                           </Select>
                         )}
@@ -495,11 +589,13 @@ export function PublicLandAcquisitionForm() {
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="idDocument">ID Document</Label>
-                      <Input id="idDocument" type="file" onChange={(e) => handleFileUpload(e, 'id')} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="proofOfFunds">Proof of Funds</Label>
-                      <Input id="proofOfFunds" type="file" onChange={(e) => handleFileUpload(e, 'funds')} />
+                      <Input id="idDocument" type="file" onChange={handleFileUpload} />
+                      {errors.idDocument && (
+                        <div className="text-sm text-red-600 flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4" />
+                          {errors.idDocument.message}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

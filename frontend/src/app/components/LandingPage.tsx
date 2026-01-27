@@ -217,7 +217,7 @@ export function LandingPage() {
 
       {/* Hero Section */}
       <div className="container mx-auto px-4 py-16">
-        <div className="max-w-4xl mx-auto text-center space-y-6">
+        <div className="max-w-6xl mx-auto text-center space-y-6">
           <h2 className="text-5xl font-bold text-gray-900">
             Welcome to Sukonowo
           </h2>
@@ -322,7 +322,7 @@ export function LandingPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Type</label>
+                      <label className="text-sm font-medium">Inventory Type</label>
                       <Select value={typeFilter} onValueChange={setTypeFilter}>
                         <SelectTrigger>
                           <SelectValue placeholder="All Types" />
@@ -391,6 +391,7 @@ export function LandingPage() {
                             {getPropertyIcon(inv.type)}
                           </div>
                         </div>
+                        <div className="text-xs text-gray-500">{inv.type}</div>
                         <CardDescription className="line-clamp-2">
                           {inv.description}
                         </CardDescription>
@@ -417,10 +418,12 @@ export function LandingPage() {
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
-                          <div className="flex items-center gap-2 text-sm">
-                            <Square className="h-4 w-4 text-gray-500" />
-                            <span>{inv.size.toLocaleString()} m²</span>
-                          </div>
+                          {inv.type !== 'Car Rentals' && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Square className="h-4 w-4 text-gray-500" />
+                              <span>{inv.size.toLocaleString()} m²</span>
+                            </div>
+                          )}
                           <div className="flex items-center gap-2 text-sm">
                             <DollarSign className="h-4 w-4 text-gray-500" />
                             <span>D{inv.price}K</span>

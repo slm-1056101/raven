@@ -132,7 +132,7 @@ export function InventoryTypeLanding() {
       </header>
 
       <div className="container mx-auto px-4 py-10">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <div className="flex items-end justify-between gap-4 flex-wrap">
             <div>
               <h2 className="text-3xl font-bold text-gray-900">{publicInventoryType ?? 'Inventories'}</h2>
@@ -244,6 +244,7 @@ export function InventoryTypeLanding() {
                     </div>
                     <CardHeader>
                       <CardTitle className="text-lg">{inv.title}</CardTitle>
+                      <div className="text-xs text-gray-500">{inv.type}</div>
                       <CardDescription className="line-clamp-2">{inv.description}</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-2">
@@ -253,20 +254,11 @@ export function InventoryTypeLanding() {
                         <span>{inv.location}</span>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Square className="h-4 w-4 text-gray-500" />
-                          <span>{inv.size.toLocaleString()} m²</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          <DollarSign className="h-4 w-4 text-gray-500" />
-                          <span>D{inv.price}K</span>
-                        </div>
-                      </div>
-
-                      <div className="pt-2">
+                      <div className="pt-3">
                         <Button
-                          className="w-full"
+                          type="button"
+                          className="w-full bg-blue-600 hover:bg-blue-700"
+                          disabled={inv.status !== 'Available'}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleApplyNow(inv);
@@ -275,6 +267,7 @@ export function InventoryTypeLanding() {
                           Apply Now
                         </Button>
                       </div>
+
                     </CardContent>
                   </Card>
                 ))}

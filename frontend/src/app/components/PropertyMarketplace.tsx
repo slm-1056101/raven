@@ -5,7 +5,6 @@ import { Button } from '@/app/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
 import { Badge } from '@/app/components/ui/badge';
 import { useApp } from '@/app/context/AppContext';
-import { LandAcquisitionForm } from '@/app/components/LandAcquisitionForm';
 import { LayoutDocumentPreviewDialog } from '@/app/components/LayoutDocumentPreviewDialog';
 import type { Property } from '@/app/types';
 
@@ -15,8 +14,6 @@ export function PropertyMarketplace() {
   const [sizeFilter, setSizeFilter] = useState('all');
   const [priceFilter, setPriceFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
-  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
-  const [showApplicationForm, setShowApplicationForm] = useState(false);
 
   const [layoutPreviewOpen, setLayoutPreviewOpen] = useState(false);
   const [layoutPreviewUrl, setLayoutPreviewUrl] = useState<string | null>(null);
@@ -31,25 +28,9 @@ export function PropertyMarketplace() {
   ).sort((a, b) => a.localeCompare(b));
 
   const handleApplyNow = (property: Property) => {
-    const isRentalType =
-      property.type === 'Property Rentals' ||
-      property.type === 'Commercial Rentals' ||
-      property.type === 'Car Rentals';
-
-    if (isRentalType) {
-      setPublicCompanyId(property.companyId);
-      setPublicProperty(property);
-      setCurrentView('public-application');
-      return;
-    }
-
-    setSelectedProperty(property);
-    setShowApplicationForm(true);
-  };
-
-  const handleFormClose = () => {
-    setShowApplicationForm(false);
-    setSelectedProperty(null);
+    setPublicCompanyId(property.companyId);
+    setPublicProperty(property);
+    setCurrentView('public-application');
   };
 
   const hasApplied = (propertyId: string) => {
@@ -126,17 +107,8 @@ export function PropertyMarketplace() {
     }
   };
 
-  if (showApplicationForm && selectedProperty) {
-    return (
-      <LandAcquisitionForm
-        property={selectedProperty}
-        onClose={handleFormClose}
-      />
-    );
-  }
-
   return (
-    <div className="space-y-8">
+    <div className="max-w-6xl mx-auto space-y-8">
       {/* Page Header */}
       <div>
         <h2 className="text-3xl font-bold">Vacant Land Marketplace</h2>
@@ -255,6 +227,7 @@ export function PropertyMarketplace() {
                 <CardTitle className="text-lg">{property.title}</CardTitle>
                 {getPropertyIcon(property.type)}
               </div>
+              <div className="text-xs text-gray-500">{property.type}</div>
               <CardDescription className="line-clamp-2">
                 {property.description}
               </CardDescription>
@@ -290,10 +263,12 @@ export function PropertyMarketplace() {
               )}
               
               <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center gap-2 text-sm">
-                  <Square className="h-4 w-4 text-gray-500" />
-                  <span>{property.size.toLocaleString()} m²</span>
-                </div>
+                {property.type !== 'Car Rentals' && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Square className="h-4 w-4 text-gray-500" />
+                    <span>{property.size.toLocaleString()} m²</span>
+                  </div>
+                )}
                 <div className="flex items-center gap-2 text-sm">
                   <DollarSign className="h-4 w-4 text-gray-500" />
                   <span>D{property.price}K</span>
@@ -311,17 +286,13 @@ export function PropertyMarketplace() {
 
             {/* Card Footer */}
             <CardFooter>
-              {hasApplied(property.id) ? (
-                <Button className="w-full bg-gray-500 hover:bg-gray-500" disabled>
+              {currentUser && hasApplied(property.id) ? (
+                <Button className="w-full" variant="outline" disabled>
                   Applied
                 </Button>
               ) : (
                 <Button
-                  className={
-                    property.status === 'Available'
-                      ? 'w-full bg-blue-600 hover:bg-blue-700'
-                      : 'w-full bg-gray-500 hover:bg-gray-500'
-                  }
+                  className="w-full bg-blue-600 hover:bg-blue-700"
                   disabled={property.status !== 'Available'}
                   onClick={() => handleApplyNow(property)}
                 >
