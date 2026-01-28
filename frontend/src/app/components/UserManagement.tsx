@@ -12,16 +12,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useApp } from '@/app/context/AppContext';
 import { format } from 'date-fns';
 import { notifyError, notifySuccess } from '@/app/notify';
+import { apiFetch } from '@/app/api';
 
 import type { User } from '@/app/types';
 
 export function UserManagement() {
-  const { getCompanyUsers, updateUser, authToken } = useApp();
+  const { getCompanyUsers, updateUser, authToken, refreshAll, hydrateFromApi, currentUser } = useApp();
   const users = getCompanyUsers();
   const [searchQuery, setSearchQuery] = useState('');
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [formData, setFormData] = useState<Partial<User>>({});
+
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [createFormData, setCreateFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    password: '',
+    confirmPassword: '',
+  });
 
   const filteredUsers = users.filter((user) =>
     user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -32,8 +42,59 @@ export function UserManagement() {
   const stats = {
     total: users.length,
     active: users.filter(u => u.status === 'Active').length,
-    clients: users.filter(u => u.role === 'Client').length,
     admins: users.filter(u => u.role === 'Admin').length,
+    inactive: users.filter(u => u.status === 'Inactive').length,
+  };
+
+  const handleCreateAdmin = () => {
+    if (!authToken) {
+      notifyError('Missing auth token');
+      return;
+    }
+
+    const normalizedEmail = createFormData.email.trim().toLowerCase();
+    if (!createFormData.name.trim()) {
+      notifyError('Please enter full name');
+      return;
+    }
+    if (!normalizedEmail) {
+      notifyError('Please enter email');
+      return;
+    }
+    if (!createFormData.password) {
+      notifyError('Please enter password');
+      return;
+    }
+    if (createFormData.password !== createFormData.confirmPassword) {
+      notifyError('Passwords do not match');
+      return;
+    }
+
+    (async () => {
+      try {
+        await apiFetch('/api/users/', {
+          token: authToken,
+          method: 'POST',
+          body: JSON.stringify({
+            name: createFormData.name.trim(),
+            email: normalizedEmail,
+            phone: createFormData.phone.trim(),
+            role: 'Admin',
+            status: 'Active',
+            password: createFormData.password,
+          }),
+        });
+
+        const data = await refreshAll(authToken, { includeUsers: true, role: currentUser?.role });
+        hydrateFromApi(data);
+
+        notifySuccess('Admin user created');
+        setShowCreateDialog(false);
+        setCreateFormData({ name: '', email: '', phone: '', password: '', confirmPassword: '' });
+      } catch (err: any) {
+        notifyError(err?.message || 'Failed to create admin user');
+      }
+    })();
   };
 
   const handleEdit = (user: User) => {
@@ -129,8 +190,8 @@ export function UserManagement() {
                 <Users className="h-6 w-6 text-blue-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{stats.clients}</p>
-                <p className="text-sm text-gray-600 mt-1">Clients</p>
+                <p className="text-2xl font-bold">{stats.inactive}</p>
+                <p className="text-sm text-gray-600 mt-1">Inactive</p>
               </div>
             </div>
           </CardContent>
@@ -169,8 +230,15 @@ export function UserManagement() {
       {/* Users Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Users</CardTitle>
-          <CardDescription>View and manage system users</CardDescription>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <CardTitle>Admin Users</CardTitle>
+              <CardDescription>View and manage admin users in this company</CardDescription>
+            </div>
+            <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setShowCreateDialog(true)}>
+              Create Admin
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -296,14 +364,13 @@ export function UserManagement() {
             <div className="space-y-2">
               <Label htmlFor="role">Role</Label>
               <Select
-                value={formData.role}
-                onValueChange={(value) => setFormData({ ...formData, role: value as User['role'] })}
+                value={'Admin'}
+                onValueChange={() => {}}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Client">Client</SelectItem>
                   <SelectItem value="Admin">Admin</SelectItem>
                 </SelectContent>
               </Select>
@@ -340,6 +407,74 @@ export function UserManagement() {
             </Button>
             <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleSave}>
               Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create Admin</DialogTitle>
+            <DialogDescription>Create another admin user for this company</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="createName">Full Name</Label>
+              <Input
+                id="createName"
+                value={createFormData.name}
+                onChange={(e) => setCreateFormData({ ...createFormData, name: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="createEmail">Email</Label>
+              <Input
+                id="createEmail"
+                type="email"
+                value={createFormData.email}
+                onChange={(e) => setCreateFormData({ ...createFormData, email: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="createPhone">Phone</Label>
+              <Input
+                id="createPhone"
+                value={createFormData.phone}
+                onChange={(e) => setCreateFormData({ ...createFormData, phone: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="createPassword">Password</Label>
+              <Input
+                id="createPassword"
+                type="password"
+                value={createFormData.password}
+                onChange={(e) => setCreateFormData({ ...createFormData, password: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="createConfirmPassword">Confirm Password</Label>
+              <Input
+                id="createConfirmPassword"
+                type="password"
+                value={createFormData.confirmPassword}
+                onChange={(e) => setCreateFormData({ ...createFormData, confirmPassword: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+              Cancel
+            </Button>
+            <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleCreateAdmin}>
+              Create
             </Button>
           </DialogFooter>
         </DialogContent>

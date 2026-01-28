@@ -5,19 +5,15 @@ import { Button } from '@/app/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
 import { Badge } from '@/app/components/ui/badge';
 import { useApp } from '@/app/context/AppContext';
-import { LandAcquisitionForm } from '@/app/components/LandAcquisitionForm';
 import { LayoutDocumentPreviewDialog } from '@/app/components/LayoutDocumentPreviewDialog';
 import type { Property } from '@/app/types';
 
 export function PropertyMarketplace() {
-  const { getCompanyProperties, currentCompany } = useApp();
-  const properties = getCompanyProperties();
+  const { properties, applications, currentUser, setPublicCompanyId, setPublicProperty, setCurrentView } = useApp();
   const [locationFilter, setLocationFilter] = useState('all');
   const [sizeFilter, setSizeFilter] = useState('all');
   const [priceFilter, setPriceFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
-  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
-  const [showApplicationForm, setShowApplicationForm] = useState(false);
 
   const [layoutPreviewOpen, setLayoutPreviewOpen] = useState(false);
   const [layoutPreviewUrl, setLayoutPreviewUrl] = useState<string | null>(null);
@@ -32,13 +28,19 @@ export function PropertyMarketplace() {
   ).sort((a, b) => a.localeCompare(b));
 
   const handleApplyNow = (property: Property) => {
-    setSelectedProperty(property);
-    setShowApplicationForm(true);
+    setPublicCompanyId(property.companyId);
+    setPublicProperty(property);
+    setCurrentView('public-application');
   };
 
-  const handleFormClose = () => {
-    setShowApplicationForm(false);
-    setSelectedProperty(null);
+  const hasApplied = (propertyId: string) => {
+    if (!currentUser) return false;
+    return applications.some((a) => {
+      if (a.propertyId !== propertyId) return false;
+      if (a.userId && a.userId === currentUser.id) return true;
+      if (a.applicantEmail && a.applicantEmail.toLowerCase() === currentUser.email.toLowerCase()) return true;
+      return false;
+    });
   };
 
   const filteredProperties = properties.filter((property) => {
@@ -76,12 +78,17 @@ export function PropertyMarketplace() {
 
   const getPropertyIcon = (type: string) => {
     switch (type) {
-      case 'Residential':
+      case 'Property Rentals':
+      case 'Land For Sale':
         return <Home className="h-5 w-5 text-blue-600" />;
-      case 'Commercial':
+      case 'Commercial Rentals':
         return <Building2 className="h-5 w-5 text-blue-600" />;
       case 'Agricultural':
         return <Sprout className="h-5 w-5 text-blue-600" />;
+      case 'Car Rentals':
+        return <Building2 className="h-5 w-5 text-blue-600" />;
+      case 'Other':
+        return <Building2 className="h-5 w-5 text-blue-600" />;
       default:
         return <Building2 className="h-5 w-5 text-blue-600" />;
     }
@@ -100,17 +107,8 @@ export function PropertyMarketplace() {
     }
   };
 
-  if (showApplicationForm && selectedProperty) {
-    return (
-      <LandAcquisitionForm
-        property={selectedProperty}
-        onClose={handleFormClose}
-      />
-    );
-  }
-
   return (
-    <div className="space-y-8">
+    <div className="max-w-6xl mx-auto space-y-8">
       {/* Page Header */}
       <div>
         <h2 className="text-3xl font-bold">Vacant Land Marketplace</h2>
@@ -184,9 +182,12 @@ export function PropertyMarketplace() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="Residential">Residential</SelectItem>
-                  <SelectItem value="Commercial">Commercial</SelectItem>
+                  <SelectItem value="Property Rentals">Property Rentals</SelectItem>
+                  <SelectItem value="Commercial Rentals">Commercial Rentals</SelectItem>
                   <SelectItem value="Agricultural">Agricultural</SelectItem>
+                  <SelectItem value="Land For Sale">Land For Sale</SelectItem>
+                  <SelectItem value="Car Rentals">Car Rentals</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -226,6 +227,7 @@ export function PropertyMarketplace() {
                 <CardTitle className="text-lg">{property.title}</CardTitle>
                 {getPropertyIcon(property.type)}
               </div>
+              <div className="text-xs text-gray-500">{property.type}</div>
               <CardDescription className="line-clamp-2">
                 {property.description}
               </CardDescription>
@@ -261,10 +263,12 @@ export function PropertyMarketplace() {
               )}
               
               <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center gap-2 text-sm">
-                  <Square className="h-4 w-4 text-gray-500" />
-                  <span>{property.size.toLocaleString()} m²</span>
-                </div>
+                {property.type !== 'Car Rentals' && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Square className="h-4 w-4 text-gray-500" />
+                    <span>{property.size.toLocaleString()} m²</span>
+                  </div>
+                )}
                 <div className="flex items-center gap-2 text-sm">
                   <DollarSign className="h-4 w-4 text-gray-500" />
                   <span>D{property.price}K</span>
@@ -282,13 +286,19 @@ export function PropertyMarketplace() {
 
             {/* Card Footer */}
             <CardFooter>
-              <Button 
-                className="w-full bg-blue-600 hover:bg-blue-700"
-                disabled={property.status !== 'Available'}
-                onClick={() => handleApplyNow(property)}
-              >
-                Apply Now
-              </Button>
+              {currentUser && hasApplied(property.id) ? (
+                <Button className="w-full" variant="outline" disabled>
+                  Applied
+                </Button>
+              ) : (
+                <Button
+                  className="w-full bg-blue-600 hover:bg-blue-700"
+                  disabled={property.status !== 'Available'}
+                  onClick={() => handleApplyNow(property)}
+                >
+                  Apply Now
+                </Button>
+              )}
             </CardFooter>
           </Card>
         ))}

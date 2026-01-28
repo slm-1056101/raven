@@ -8,6 +8,7 @@ from .views import (
     CompanyViewSet,
     HealthView,
     MeView,
+    PublicApplicationPrecheckView,
     PublicApplicationsView,
     PublicCompaniesView,
     PublicPropertiesView,
@@ -32,6 +33,7 @@ urlpatterns = [
     path('auth/active-company/', ActiveCompanyView.as_view(), name='active_company'),
     path('public/companies/', PublicCompaniesView.as_view(), name='public_companies'),
     path('public/properties/', PublicPropertiesView.as_view(), name='public_properties'),
+    path('public/applications/precheck/', PublicApplicationPrecheckView.as_view(), name='public_application_precheck'),
     path('public/applications/', PublicApplicationsView.as_view(), name='public_applications'),
     path('', include(router.urls)),
 ]

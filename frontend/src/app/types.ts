@@ -8,10 +8,12 @@ export interface Property {
   price: number;
   size: number;
   status: 'Available' | 'Reserved' | 'Sold';
-  type: 'Residential' | 'Commercial' | 'Agricultural';
+  type: 'Property Rentals' | 'Commercial Rentals' | 'Agricultural' | 'Land For Sale' | 'Car Rentals' | 'Other';
   imageUrl: string;
+  imageUrls?: string[];
   layoutImageUrl?: string;
   features: string[];
+  financingMethods?: string[];
   companyId: string;
 }
 

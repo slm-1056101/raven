@@ -1,10 +1,13 @@
 import datetime
+import json
 
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from django.db import models
 from django.db import transaction
+from django.http import QueryDict
 
-from .models import Application, Company, CompanyMembership, Property, User
+from .models import Application, Company, CompanyMembership, Property, PropertyImage, User
 
 
 class CoerceDateField(serializers.DateField):
@@ -139,7 +142,8 @@ class ClientSignupSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True, min_length=6)
     companyIds = serializers.ListField(
         child=serializers.UUIDField(),
-        allow_empty=False,
+        allow_empty=True,
+        required=False,
     )
 
     def validate_companyIds(self, value):
@@ -153,7 +157,7 @@ class ClientSignupSerializer(serializers.Serializer):
         email = self.validated_data['email'].lower()
         phone = self.validated_data.get('phone', '')
         password = self.validated_data['password']
-        company_ids = self.validated_data['companyIds']
+        company_ids = self.validated_data.get('companyIds') or []
 
         user = User.objects.filter(email=email).first()
 
@@ -176,13 +180,10 @@ class ClientSignupSerializer(serializers.Serializer):
                 status=User.Status.ACTIVE,
             )
 
-        companies = list(Company.objects.filter(id__in=company_ids))
-        for company in companies:
-            CompanyMembership.objects.get_or_create(user=user, company=company)
-
-        if not user.company_id and companies:
-            user.company = companies[0]
-            user.save(update_fields=['company'])
+        # Clients are platform-wide and are not linked to any single company.
+        # We intentionally do not create CompanyMembership links and do not set user.company.
+        user.company = None
+        user.save(update_fields=['company'])
 
         return user
 
@@ -220,23 +221,170 @@ class PropertySerializer(serializers.ModelSerializer):
     companyId = serializers.UUIDField(source='company_id', required=False, allow_null=True)
     plotNumber = serializers.CharField(source='plot_number', required=False, allow_blank=True, allow_null=True)
     roomNumber = serializers.CharField(source='room_number', required=False, allow_blank=True, allow_null=True)
+    financingMethods = serializers.JSONField(
+        source='financing_methods',
+        required=False,
+    )
     image = serializers.ImageField(required=False, allow_null=True, write_only=True)
     imageUrl = serializers.SerializerMethodField()
+    imageUrls = serializers.SerializerMethodField()
     layoutImage = serializers.FileField(source='layout_image', required=False, allow_null=True, write_only=True)
     layoutImageUrl = serializers.SerializerMethodField()
 
-    def get_imageUrl(self, obj):
-        image = getattr(obj, 'image', None)
-        if not image:
+    def _file_url(self, file_field):
+        if not file_field:
             return ''
         try:
-            url = image.url
+            url = file_field.url
         except Exception:
             return ''
         request = self.context.get('request')
         if request:
             return request.build_absolute_uri(url)
         return url
+
+    def _incoming_images(self):
+        request = self.context.get('request')
+        if not request:
+            return []
+        files = getattr(request, 'FILES', None)
+        if not files:
+            return []
+        images = []
+        try:
+            images = files.getlist('images')
+        except Exception:
+            images = []
+        if not images:
+            try:
+                images = files.getlist('images[]')
+            except Exception:
+                images = []
+        return [f for f in images if f]
+
+    def to_internal_value(self, data):
+        is_querydict = isinstance(data, QueryDict)
+        if is_querydict:
+            data = data.copy()
+        elif not isinstance(data, dict):
+            data = dict(data)
+
+        raw = data.get('financingMethods')
+
+        def coerce_string_list(value):
+            if value is None:
+                return None
+
+            # If a single value arrives, allow treating it as a one-item list.
+            if isinstance(value, str):
+                # Often arrives as a JSON string when sent via multipart.
+                try:
+                    parsed = json.loads(value)
+                    if isinstance(parsed, list):
+                        return parsed
+                except Exception:
+                    pass
+                return [value]
+
+            if isinstance(value, dict):
+                try:
+                    items = list(value.items())
+                    items.sort(key=lambda kv: int(kv[0]) if str(kv[0]).isdigit() else str(kv[0]))
+                    ordered_values = [v for _, v in items]
+                except Exception:
+                    ordered_values = list(value.values())
+                return coerce_string_list(ordered_values)
+
+            if isinstance(value, (list, tuple)):
+                out = []
+                for item in value:
+                    if isinstance(item, str):
+                        # Sometimes we get a list of JSON strings.
+                        try:
+                            parsed = json.loads(item)
+                            if isinstance(parsed, list):
+                                out.extend(parsed)
+                                continue
+                        except Exception:
+                            pass
+                        out.append(item)
+                        continue
+                    if isinstance(item, (list, tuple, dict)):
+                        nested = coerce_string_list(item)
+                        if nested is not None:
+                            out.extend(nested)
+                        continue
+                    out.append(item)
+                return out
+
+            return value
+
+        coerced = coerce_string_list(raw)
+        if coerced is not None:
+            # When data is a QueryDict (multipart/form-data), assigning Python lists can
+            # get stringified in a non-JSON way. Keep it as a JSON string for JSONField.
+            if is_querydict:
+                try:
+                    data['financingMethods'] = json.dumps(coerced)
+                except Exception:
+                    data['financingMethods'] = coerced
+            else:
+                data['financingMethods'] = coerced
+
+        return super().to_internal_value(data)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        methods = attrs.get('financing_methods', None)
+
+        # financing_methods is required on create. On update, if provided, it cannot be emptied.
+        if getattr(self, 'instance', None) is None and methods is None:
+            raise ValidationError({'financingMethods': 'At least one financing method is required'})
+
+        if methods is None:
+            return attrs
+
+        if not isinstance(methods, list):
+            raise ValidationError({'financingMethods': 'Expected a list of strings'})
+
+        if len(methods) == 0:
+            raise ValidationError({'financingMethods': 'At least one financing method is required'})
+
+        for idx, m in enumerate(methods):
+            if not isinstance(m, str):
+                raise ValidationError({'financingMethods': {str(idx): ['Not a valid string.']}})
+
+        return attrs
+
+    def get_imageUrl(self, obj):
+        image = getattr(obj, 'image', None)
+        if image:
+            return self._file_url(image)
+        first = getattr(obj, 'images', None)
+        try:
+            first = obj.images.order_by('order', 'created_at').first()
+        except Exception:
+            first = None
+        if first and getattr(first, 'image', None):
+            return self._file_url(first.image)
+        return ''
+
+    def get_imageUrls(self, obj):
+        urls = []
+        # Prefer multi-image relation when present.
+        try:
+            for pi in obj.images.order_by('order', 'created_at').all():
+                u = self._file_url(getattr(pi, 'image', None))
+                if u:
+                    urls.append(u)
+        except Exception:
+            urls = []
+
+        # Backward compatible fallback to single image field.
+        single = self._file_url(getattr(obj, 'image', None))
+        if single and single not in urls:
+            urls.insert(0, single)
+        return urls
 
     def get_layoutImageUrl(self, obj):
         image = getattr(obj, 'layout_image', None)
@@ -267,12 +415,18 @@ class PropertySerializer(serializers.ModelSerializer):
             'type',
             'image',
             'imageUrl',
+            'imageUrls',
             'layoutImage',
             'layoutImageUrl',
             'features',
+            'financingMethods',
         )
 
     def create(self, validated_data):
+        incoming_images = self._incoming_images()
+        if incoming_images and not validated_data.get('image'):
+            validated_data['image'] = incoming_images[0]
+
         company_id = validated_data.pop('company_id', None)
         if company_id:
             company = Company.objects.get(id=company_id)
@@ -302,6 +456,10 @@ class PropertySerializer(serializers.ModelSerializer):
 
         instance = super().create(validated_data)
 
+        if incoming_images:
+            for idx, f in enumerate(incoming_images):
+                PropertyImage.objects.create(property=instance, image=f, order=idx)
+
         # Overwrite all properties in the same company+location to share this uploaded/populated layout image.
         if instance.location and getattr(instance, 'layout_image', None):
             Property.objects.filter(
@@ -315,6 +473,10 @@ class PropertySerializer(serializers.ModelSerializer):
         return instance
 
     def update(self, instance, validated_data):
+        incoming_images = self._incoming_images()
+        if incoming_images and not validated_data.get('image'):
+            validated_data['image'] = incoming_images[0]
+
         # Track target location post-update (location could be patched).
         location = validated_data.get('location', instance.location)
 
@@ -336,6 +498,14 @@ class PropertySerializer(serializers.ModelSerializer):
                 validated_data['layout_image'] = existing.layout_image
 
         updated = super().update(instance, validated_data)
+
+        if incoming_images:
+            current_max_order = (
+                PropertyImage.objects.filter(property=updated).aggregate(models.Max('order')).get('order__max')
+            )
+            base = int(current_max_order or 0)
+            for idx, f in enumerate(incoming_images):
+                PropertyImage.objects.create(property=updated, image=f, order=base + idx + 1)
 
         # If a layout exists after update, overwrite all properties in same company+location to share it.
         if updated.location and getattr(updated, 'layout_image', None):
@@ -364,6 +534,7 @@ class ApplicationSerializer(serializers.ModelSerializer):
     propertyId = serializers.UUIDField(source='property_id', required=False, allow_null=True)
     userId = serializers.UUIDField(source='user_id', required=False, allow_null=True)
     applicantName = serializers.CharField(source='applicant_name')
+    surname = serializers.CharField(required=False, allow_blank=True, write_only=True)
     applicantEmail = serializers.EmailField(source='applicant_email')
     applicantPhone = serializers.CharField(source='applicant_phone', required=False, allow_blank=True)
     applicantAddress = serializers.CharField(source='applicant_address', required=False, allow_blank=True)
@@ -373,6 +544,47 @@ class ApplicationSerializer(serializers.ModelSerializer):
     dateApplied = serializers.SerializerMethodField()
     idDocument = serializers.FileField(source='id_document', required=False, allow_null=True, write_only=True)
     proofOfFunds = serializers.FileField(source='proof_of_funds', required=False, allow_null=True, write_only=True)
+    startDate = CoerceDateField(required=False, allow_null=True, write_only=True)
+    endDate = CoerceDateField(required=False, allow_null=True, write_only=True)
+    pickupTime = serializers.CharField(required=False, allow_blank=True, write_only=True)
+
+    def to_internal_value(self, data):
+        if isinstance(data, QueryDict):
+            data = data.copy()
+        elif not isinstance(data, dict):
+            data = dict(data)
+
+        if 'financing_method' in data and 'financingMethod' not in data:
+            data['financingMethod'] = data.get('financing_method')
+        if 'intended_use' in data and 'intendedUse' not in data:
+            data['intendedUse'] = data.get('intended_use')
+
+        # Some clients accidentally send the literal string 'undefined'/'null'.
+        # Treat these as empty so we don't persist bad values.
+        fm = data.get('financingMethod')
+        if isinstance(fm, str) and fm.strip().lower() in ('undefined', 'null'):
+            data['financingMethod'] = ''
+
+        return super().to_internal_value(data)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        property_obj = attrs.get('property')
+
+        # Require financing method on create.
+        if getattr(self, 'instance', None) is None:
+            fm = attrs.get('financing_method')
+            if not fm:
+                raise ValidationError({'financingMethod': 'Financing method is required'})
+
+        financing_method = attrs.get('financing_method')
+        if financing_method and property_obj is not None:
+            allowed = getattr(property_obj, 'financing_methods', None) or []
+            if isinstance(allowed, list) and len(allowed) > 0 and financing_method not in allowed:
+                raise ValidationError({'financingMethod': 'Selected financing method is not allowed for this property'})
+
+        return attrs
 
     def get_dateApplied(self, obj):
         value = getattr(obj, 'date_applied', None)
@@ -410,6 +622,7 @@ class ApplicationSerializer(serializers.ModelSerializer):
             'propertyId',
             'userId',
             'applicantName',
+            'surname',
             'applicantEmail',
             'applicantPhone',
             'applicantAddress',
@@ -420,6 +633,9 @@ class ApplicationSerializer(serializers.ModelSerializer):
             'dateApplied',
             'idDocument',
             'proofOfFunds',
+            'startDate',
+            'endDate',
+            'pickupTime',
             'documents',
         )
         extra_kwargs = {
@@ -433,6 +649,11 @@ class ApplicationSerializer(serializers.ModelSerializer):
         property_id = validated_data.pop('property_id', None)
         user_id = validated_data.pop('user_id', None)
 
+        surname = validated_data.pop('surname', None)
+        start_date = validated_data.pop('startDate', None)
+        end_date = validated_data.pop('endDate', None)
+        pickup_time = validated_data.pop('pickupTime', None)
+
         id_doc = validated_data.get('id_document')
         pof = validated_data.get('proof_of_funds')
         if id_doc:
@@ -443,6 +664,22 @@ class ApplicationSerializer(serializers.ModelSerializer):
             validated_data.setdefault('documents', {})
             if isinstance(validated_data['documents'], dict):
                 validated_data['documents']['proofOfFundsName'] = getattr(pof, 'name', '')
+
+        if start_date or end_date:
+            validated_data.setdefault('documents', {})
+            if isinstance(validated_data['documents'], dict):
+                if start_date:
+                    validated_data['documents']['startDate'] = start_date.isoformat()
+                if end_date:
+                    validated_data['documents']['endDate'] = end_date.isoformat()
+
+        if surname or pickup_time:
+            validated_data.setdefault('documents', {})
+            if isinstance(validated_data['documents'], dict):
+                if surname:
+                    validated_data['documents']['surname'] = str(surname)
+                if pickup_time:
+                    validated_data['documents']['pickupTime'] = str(pickup_time)
 
         if company_id:
             validated_data['company'] = Company.objects.get(id=company_id)

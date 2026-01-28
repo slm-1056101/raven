@@ -3,12 +3,12 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import { apiFetch } from '@/app/api';
 import type { Application, Company, Property, User } from '@/app/types';
 
-interface AppContextType {
+ interface AppContextType {
   properties: Property[];
   applications: Application[];
   users: User[];
   companies: Company[];
-  currentView: 'landing' | 'companies-landing' | 'company-landing' | 'public-application' | 'login' | 'signup' | 'company-selection' | 'client' | 'admin' | 'super-admin';
+  currentView: 'landing' | 'companies-landing' | 'company-landing' | 'inventory-type' | 'public-application' | 'login' | 'signup' | 'company-selection' | 'client' | 'admin' | 'super-admin';
   currentCompany: Company | null;
   currentUser: User | null;
   authToken: string | null;
@@ -16,7 +16,8 @@ interface AppContextType {
   intendedCompanyName: string | null;
   publicCompanyId: string | null;
   publicProperty: Property | null;
-  setCurrentView: (view: 'landing' | 'companies-landing' | 'company-landing' | 'public-application' | 'login' | 'signup' | 'company-selection' | 'client' | 'admin' | 'super-admin') => void;
+  publicInventoryType: Property['type'] | null;
+  setCurrentView: (view: 'landing' | 'companies-landing' | 'company-landing' | 'inventory-type' | 'public-application' | 'login' | 'signup' | 'company-selection' | 'client' | 'admin' | 'super-admin') => void;
   setCurrentCompany: (company: Company | null) => void;
   setCurrentUser: (user: User | null) => void;
   setAuthToken: (token: string | null) => void;
@@ -24,9 +25,10 @@ interface AppContextType {
   setIntendedCompanyName: (companyName: string | null) => void;
   setPublicCompanyId: (companyId: string | null) => void;
   setPublicProperty: (property: Property | null) => void;
+  setPublicInventoryType: (type: Property['type'] | null) => void;
   refreshAll: (
     token: string,
-    options?: { includeUsers?: boolean },
+    options?: { includeUsers?: boolean; role?: User['role'] },
   ) => Promise<{ companies: Company[]; properties: Property[]; applications: Application[]; users?: User[] }>;
   hydrateFromApi: (data: {
     companies?: Company[];
@@ -57,13 +59,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [applications, setApplications] = useState<Application[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [currentView, setCurrentView] = useState<'landing' | 'companies-landing' | 'company-landing' | 'public-application' | 'login' | 'signup' | 'company-selection' | 'client' | 'admin' | 'super-admin'>('landing');
+  const [currentView, setCurrentView] = useState<'landing' | 'companies-landing' | 'company-landing' | 'inventory-type' | 'public-application' | 'login' | 'signup' | 'company-selection' | 'client' | 'admin' | 'super-admin'>('landing');
   const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [intendedCompanyId, setIntendedCompanyId] = useState<string | null>(null);
   const [intendedCompanyName, setIntendedCompanyName] = useState<string | null>(null);
   const [publicCompanyId, setPublicCompanyId] = useState<string | null>(null);
   const [publicProperty, setPublicProperty] = useState<Property | null>(null);
+  const [publicInventoryType, setPublicInventoryType] = useState<Property['type'] | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(() => {
     try {
       return localStorage.getItem('raven_auth_token');
@@ -92,7 +95,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         const me = await apiFetch<User>('/api/auth/me/', { token: authToken });
-        const data = await refreshAll(authToken, { includeUsers: me.role !== 'Client' });
+        const data = await refreshAll(authToken, { includeUsers: me.role !== 'Client', role: me.role });
         hydrateFromApi(data);
 
         setCurrentUser(me);
@@ -105,12 +108,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         } else if (me.role === 'Admin') {
           setCurrentView('admin');
         } else if (me.role === 'Client') {
-          const ids = (me.companyIds && me.companyIds.length > 0) ? me.companyIds : (me.companyId ? [me.companyId] : []);
-          if (ids.length > 1) {
-            setCurrentView('company-selection');
-          } else {
-            setCurrentView('client');
-          }
+          setCurrentView('client');
         } else {
           setCurrentView('login');
         }
@@ -123,6 +121,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })();
   }, [authToken, currentUser]);
 
+  const normalizeApplication = (a: any): Application => {
+    const rawFinancing = a.financingMethod ?? a.financing_method ?? a.financingMethods ?? a.financing_methods ?? '';
+    const normalizedFinancing =
+      rawFinancing === 'undefined' || rawFinancing === 'null' ? '' : rawFinancing;
+    return {
+      ...a,
+      companyId: (a.companyId ?? a.company ?? null) as string,
+      propertyId: (a.propertyId ?? a.property ?? null) as string,
+      userId: (a.userId ?? a.user ?? null) as string | null,
+      offerAmount: typeof a.offerAmount === 'string' ? Number(a.offerAmount) : a.offerAmount,
+      financingMethod: (typeof normalizedFinancing === 'string'
+        ? normalizedFinancing
+        : String(normalizedFinancing ?? '')) as string,
+      intendedUse: (a.intendedUse ?? a.intended_use ?? '') as string,
+      dateApplied: (a.dateApplied ?? a.date_applied ?? a.created_at ?? a.createdAt ?? '') as string,
+      applicantName: (a.applicantName ?? a.applicant_name ?? '') as string,
+      applicantEmail: (a.applicantEmail ?? a.applicant_email ?? '') as string,
+      applicantPhone: (a.applicantPhone ?? a.applicant_phone ?? '') as string,
+      applicantAddress: (a.applicantAddress ?? a.applicant_address ?? '') as string,
+    } as Application;
+  };
+
   const hydrateFromApi = (data: {
     companies?: Company[];
     users?: User[];
@@ -132,16 +152,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (data.companies) setCompanies(data.companies);
     if (data.users) setUsers(data.users);
     if (data.properties) setProperties(data.properties);
-    if (data.applications) setApplications(data.applications);
+    if (data.applications) setApplications((data.applications as any[]).map(normalizeApplication));
   };
 
-  const refreshAll = async (token: string, options?: { includeUsers?: boolean }) => {
+  const refreshAll = async (token: string, options?: { includeUsers?: boolean; role?: User['role'] }) => {
     const headers = { token };
     const includeUsers = options?.includeUsers !== false;
 
+    const propertiesEndpoint = options?.role === 'Client'
+      ? '/api/public/properties/'
+      : '/api/properties/';
+
     const [companiesResp, propertiesResp, applicationsResp] = await Promise.all([
       apiFetch<Company[]>('/api/companies/', headers),
-      apiFetch<Property[]>('/api/properties/', headers),
+      apiFetch<Property[]>(propertiesEndpoint, headers),
       apiFetch<Application[]>('/api/applications/', headers),
     ]);
 
@@ -152,13 +176,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       size: typeof p.size === 'string' ? Number(p.size) : p.size,
     })) as Property[];
 
-    const normalizedApplications = (applicationsResp as any[]).map((a) => ({
-      ...a,
-      companyId: (a.companyId ?? a.company ?? null) as string,
-      propertyId: (a.propertyId ?? a.property ?? null) as string,
-      userId: (a.userId ?? a.user ?? null) as string | null,
-      offerAmount: typeof a.offerAmount === 'string' ? Number(a.offerAmount) : a.offerAmount,
-    })) as Application[];
+    const normalizedApplications = (applicationsResp as any[]).map(normalizeApplication);
 
     let usersResp: User[] | undefined;
     if (includeUsers) {
@@ -226,8 +244,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       method: 'POST',
       body: isFormData(application) ? (application as any) : JSON.stringify(application),
     });
-    setApplications((prev) => [created, ...prev]);
-    return created;
+    const normalized = normalizeApplication(created as any);
+    setApplications((prev) => [normalized, ...prev]);
+    return normalized;
   };
 
   const updateApplicationApi = async (token: string, id: string, application: Partial<Application>) => {
@@ -236,8 +255,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       method: 'PATCH',
       body: JSON.stringify(application),
     });
-    setApplications((prev) => prev.map((a) => (a.id === id ? updated : a)));
-    return updated;
+    const normalized = normalizeApplication(updated as any);
+    setApplications((prev) => prev.map((a) => (a.id === id ? normalized : a)));
+    return normalized;
   };
 
   const updateUserApi = async (token: string, id: string, user: Partial<User>) => {
@@ -309,6 +329,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         intendedCompanyName,
         publicCompanyId,
         publicProperty,
+        publicInventoryType,
         setCurrentView,
         setCurrentCompany,
         setCurrentUser,
@@ -317,6 +338,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setIntendedCompanyName,
         setPublicCompanyId,
         setPublicProperty,
+        setPublicInventoryType,
         refreshAll,
         hydrateFromApi,
         logout,

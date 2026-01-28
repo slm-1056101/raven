@@ -16,7 +16,7 @@ export function AdminLayout({ children, activeTab, onTabChange }: AdminLayoutPro
 
   const menuItems = [
     { id: 'overview', icon: LayoutDashboard, label: 'System Overview' },
-    { id: 'inventory', icon: Building2, label: 'Property Inventory' },
+    { id: 'inventory', icon: Building2, label: 'Inventory' },
     { id: 'applications', icon: FileText, label: 'Application Review' },
     { id: 'users', icon: Users, label: 'User Management' },
   ];

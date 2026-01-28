@@ -47,14 +47,14 @@ export function Login() {
       setAuthToken(token.access);
 
       const me = await apiFetch<User>('/api/auth/me/', { token: token.access });
-      const data = await refreshAll(token.access, { includeUsers: me.role !== 'Client' });
+      const data = await refreshAll(token.access, { includeUsers: me.role !== 'Client', role: me.role });
 
       hydrateFromApi(data);
 
       let effectiveUser: any = me as any;
       let effectiveData = data;
 
-      if (effectiveUser.role !== 'SuperAdmin' && intendedCompanyId) {
+      if (effectiveUser.role === 'Admin' && intendedCompanyId) {
         try {
           const updatedUser = await apiFetch('/api/auth/active-company/', {
             token: token.access,
@@ -63,7 +63,7 @@ export function Login() {
           });
 
           effectiveUser = updatedUser as any;
-          effectiveData = await refreshAll(token.access, { includeUsers: (effectiveUser as any).role !== 'Client' });
+          effectiveData = await refreshAll(token.access, { includeUsers: (effectiveUser as any).role !== 'Client', role: (effectiveUser as any).role });
           hydrateFromApi(effectiveData);
         } catch {
           // If switching fails (e.g., user not a member), fall back to normal flow.
@@ -88,14 +88,6 @@ export function Login() {
 
       if (effectiveUser.role === 'Admin') {
         setCurrentView('admin');
-        return;
-      }
-
-      const ids = (effectiveUser.companyIds && effectiveUser.companyIds.length > 0)
-        ? effectiveUser.companyIds
-        : (effectiveUser.companyId ? [effectiveUser.companyId] : []);
-      if (ids.length > 1) {
-        setCurrentView('company-selection');
         return;
       }
 
