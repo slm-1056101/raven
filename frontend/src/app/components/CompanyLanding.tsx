@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Building2, DollarSign, Home, MapPin, Square, Sprout } from 'lucide-react';
+import { ArrowLeft, Building2, ChevronLeft, ChevronRight, DollarSign, Home, MapPin, Square, Sprout, X } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
 import { Badge } from '@/app/components/ui/badge';
 import { apiFetch } from '@/app/api';
-import { LandAcquisitionForm } from '@/app/components/LandAcquisitionForm';
 import { LayoutDocumentPreviewDialog } from '@/app/components/LayoutDocumentPreviewDialog';
+import { Dialog, DialogContent } from '@/app/components/ui/dialog';
 import { useApp } from '@/app/context/AppContext';
 import { notifyError } from '@/app/notify';
 
 import type { Company, Property } from '@/app/types';
 
 export function CompanyLanding() {
-  const { publicCompanyId, setCurrentView, authToken, currentUser, setIntendedCompanyId, setIntendedCompanyName } = useApp();
+  const { publicCompanyId, setCurrentView, authToken, currentUser, setIntendedCompanyId, setIntendedCompanyName, setPublicProperty } = useApp();
 
   const [company, setCompany] = useState<Company | null>(null);
   const [properties, setProperties] = useState<Property[]>([]);
@@ -24,12 +24,13 @@ export function CompanyLanding() {
   const [priceFilter, setPriceFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
 
-  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
-  const [showApplicationForm, setShowApplicationForm] = useState(false);
-
   const [layoutPreviewOpen, setLayoutPreviewOpen] = useState(false);
   const [layoutPreviewUrl, setLayoutPreviewUrl] = useState<string | null>(null);
   const [layoutPreviewTitle, setLayoutPreviewTitle] = useState('Layout Document');
+
+  const [imageSliderOpen, setImageSliderOpen] = useState(false);
+  const [imageSliderUrls, setImageSliderUrls] = useState<string[]>([]);
+  const [imageSliderIndex, setImageSliderIndex] = useState(0);
 
   useEffect(() => {
     if (!publicCompanyId) {
@@ -125,13 +126,15 @@ export function CompanyLanding() {
       setIntendedCompanyId(publicCompanyId);
     }
 
-    setSelectedProperty(property);
-    setShowApplicationForm(true);
+    setPublicProperty(property);
+    setCurrentView('public-application');
   };
 
-  const handleFormClose = () => {
-    setShowApplicationForm(false);
-    setSelectedProperty(null);
+  const handleOpenImageSlider = (property: Property) => {
+    const urls = (property.imageUrls && property.imageUrls.length > 0 ? property.imageUrls : [property.imageUrl]).filter(Boolean);
+    setImageSliderUrls(urls);
+    setImageSliderIndex(0);
+    setImageSliderOpen(true);
   };
 
   const getPropertyIcon = (type: string) => {
@@ -160,14 +163,10 @@ export function CompanyLanding() {
     }
   };
 
-  if (showApplicationForm && selectedProperty) {
-    return <LandAcquisitionForm property={selectedProperty} onClose={handleFormClose} />;
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
-        <div className="space-y-8">
+        <div className="max-w-6xl mx-auto space-y-8">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
               <h2 className="text-3xl font-bold">{company?.name || 'Company Marketplace'}</h2>
@@ -242,16 +241,19 @@ export function CompanyLanding() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Property Type</label>
+                  <label className="text-sm font-medium">Inventory Type</label>
                   <Select value={typeFilter} onValueChange={setTypeFilter}>
                     <SelectTrigger>
                       <SelectValue placeholder="All Types" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Types</SelectItem>
-                      <SelectItem value="Residential">Residential</SelectItem>
-                      <SelectItem value="Commercial">Commercial</SelectItem>
+                      <SelectItem value="Property Rentals">Property Rentals</SelectItem>
+                      <SelectItem value="Commercial Rentals">Commercial Rentals</SelectItem>
                       <SelectItem value="Agricultural">Agricultural</SelectItem>
+                      <SelectItem value="Land For Sale">Land For Sale</SelectItem>
+                      <SelectItem value="Car Rentals">Car Rentals</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -288,6 +290,7 @@ export function CompanyLanding() {
                       <CardTitle className="text-lg">{property.title}</CardTitle>
                       {getPropertyIcon(property.type)}
                     </div>
+                    <div className="text-xs text-gray-500">{property.type}</div>
                     <CardDescription className="line-clamp-2">{property.description}</CardDescription>
                   </CardHeader>
 
@@ -320,10 +323,12 @@ export function CompanyLanding() {
                     )}
 
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Square className="h-4 w-4 text-gray-500" />
-                        <span>{property.size.toLocaleString()} m²</span>
-                      </div>
+                      {property.type !== 'Car Rentals' && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Square className="h-4 w-4 text-gray-500" />
+                          <span>{property.size.toLocaleString()} m²</span>
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 text-sm">
                         <DollarSign className="h-4 w-4 text-gray-500" />
                         <span>D{property.price}K</span>
@@ -339,9 +344,16 @@ export function CompanyLanding() {
                     </div>
                   </CardContent>
 
-                  <CardFooter>
+                  <CardFooter className="flex gap-2">
                     <Button
-                      className="w-full bg-blue-600 hover:bg-blue-700"
+                      className="flex-1"
+                      variant="outline"
+                      onClick={() => handleOpenImageSlider(property)}
+                    >
+                      View Details
+                    </Button>
+                    <Button
+                      className="flex-1 bg-blue-600 hover:bg-blue-700"
                       disabled={property.status !== 'Available'}
                       onClick={() => handleApplyNow(property)}
                     >
@@ -370,6 +382,50 @@ export function CompanyLanding() {
         title={layoutPreviewTitle}
         url={layoutPreviewUrl}
       />
+
+      <Dialog open={imageSliderOpen} onOpenChange={setImageSliderOpen}>
+        <DialogContent className="max-w-[95vw] w-[95vw] h-[90vh] p-0 overflow-hidden">
+          <div className="relative w-full h-full bg-black">
+            <button
+              type="button"
+              className="absolute top-4 right-4 z-10 text-white/90 hover:text-white"
+              onClick={() => setImageSliderOpen(false)}
+            >
+              <X className="h-6 w-6" />
+            </button>
+
+            {imageSliderUrls.length > 0 && (
+              <img
+                src={imageSliderUrls[imageSliderIndex]}
+                alt="Inventory"
+                className="w-full h-full object-contain"
+              />
+            )}
+
+            {imageSliderUrls.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 z-10 rounded-full bg-black/50 text-white p-2 hover:bg-black/70"
+                  onClick={() => setImageSliderIndex((prev) => (prev - 1 + imageSliderUrls.length) % imageSliderUrls.length)}
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                </button>
+                <button
+                  type="button"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 z-10 rounded-full bg-black/50 text-white p-2 hover:bg-black/70"
+                  onClick={() => setImageSliderIndex((prev) => (prev + 1) % imageSliderUrls.length)}
+                >
+                  <ChevronRight className="h-6 w-6" />
+                </button>
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 text-xs text-white/90 bg-black/50 px-3 py-1 rounded-full">
+                  {imageSliderIndex + 1} / {imageSliderUrls.length}
+                </div>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

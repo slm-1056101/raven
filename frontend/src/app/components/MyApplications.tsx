@@ -11,17 +11,17 @@ import { format } from 'date-fns';
 import type { Application } from '@/app/types';
 
 export function MyApplications() {
-  const { getCompanyApplications, getCompanyProperties, currentUser } = useApp();
+  const { applications: allApplications, properties: allProperties, currentUser } = useApp();
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
   const [showDialog, setShowDialog] = useState(false);
 
-  const applications = getCompanyApplications().filter((a) => {
+  const applications = allApplications.filter((a) => {
     if (!currentUser) return false;
     if (a.userId && a.userId === currentUser.id) return true;
     if (a.applicantEmail && a.applicantEmail.toLowerCase() === currentUser.email.toLowerCase()) return true;
     return false;
   });
-  const properties = getCompanyProperties();
+  const properties = allProperties;
 
   const selectedProperty = useMemo(() => {
     if (!selectedApplication) return null;
@@ -268,6 +268,32 @@ export function MyApplications() {
                 </div>
               </div>
 
+              {(selectedApplication.documents?.startDate || selectedApplication.documents?.endDate) && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Rental Period</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600">Start Date</p>
+                      <p className="font-medium">
+                        {selectedApplication.documents?.startDate
+                          ? format(new Date(selectedApplication.documents.startDate), 'MMM dd, yyyy')
+                          : '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">End Date</p>
+                      <p className="font-medium">
+                        {selectedApplication.documents?.endDate
+                          ? format(new Date(selectedApplication.documents.endDate), 'MMM dd, yyyy')
+                          : '—'}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               <Card>
                 <CardHeader>
                   <CardTitle>Property</CardTitle>
@@ -315,7 +341,11 @@ export function MyApplications() {
                 <CardContent className="space-y-2">
                   <div>
                     <p className="text-sm text-gray-600">Financing Method</p>
-                    <p className="font-medium">{selectedApplication.financingMethod}</p>
+                    <p className="font-medium">
+                      {selectedApplication.financingMethod && selectedApplication.financingMethod !== 'undefined'
+                        ? selectedApplication.financingMethod
+                        : '—'}
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Intended Use</p>

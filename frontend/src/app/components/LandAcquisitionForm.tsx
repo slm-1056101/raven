@@ -12,10 +12,11 @@ import { useApp } from '@/app/context/AppContext';
 import { notifyError, notifyInfo, notifySuccess } from '@/app/notify';
 import { apiFetch } from '@/app/api';
 
-import type { Property } from '@/app/types';
+import type { Company, Property } from '@/app/types';
 
 interface LandAcquisitionFormProps {
   property: Property;
+  company?: Company | null;
   onClose: () => void;
 }
 
@@ -32,20 +33,21 @@ interface FormData {
   proofOfFunds: File | null;
 }
 
-export function LandAcquisitionForm({ property, onClose }: LandAcquisitionFormProps) {
+export function LandAcquisitionForm({ property, company, onClose }: LandAcquisitionFormProps) {
   const { createApplication, currentCompany, currentUser, authToken, setCurrentView } = useApp();
   const [currentStep, setCurrentStep] = useState(1);
   const [idDocumentFile, setIdDocumentFile] = useState<File | null>(null);
   const [proofOfFundsFile, setProofOfFundsFile] = useState<File | null>(null);
   
   const { register, handleSubmit, trigger, control, setValue, formState: { errors } } = useForm<FormData>({
-    shouldUnregister: true,
+    shouldUnregister: false,
     defaultValues: {
       fullName: '',
       email: '',
       phone: '',
       address: '',
       propertyId: property.id,
+      financingMethod: '',
     }
   });
 
@@ -63,6 +65,10 @@ export function LandAcquisitionForm({ property, onClose }: LandAcquisitionFormPr
     { number: 4, title: 'Documents', icon: Upload },
   ];
 
+  const financingOptions = Array.isArray((property as any).financingMethods) && (property as any).financingMethods.length > 0
+    ? ((property as any).financingMethods as string[])
+    : ['Cash Payment', 'Mortgage/Loan', 'Mixed (Cash + Loan)', 'Installment Plan'];
+
   const progress = (currentStep / 4) * 100;
 
   const nextStep = () => {
@@ -77,6 +83,11 @@ export function LandAcquisitionForm({ property, onClose }: LandAcquisitionFormPr
     const companyId = currentCompany?.id || property.companyId;
     if (!companyId) {
       notifyError('Missing company');
+      return;
+    }
+
+    if (!data.financingMethod || data.financingMethod === 'undefined' || data.financingMethod === 'null') {
+      notifyError('Financing method is required');
       return;
     }
 
@@ -189,13 +200,25 @@ export function LandAcquisitionForm({ property, onClose }: LandAcquisitionFormPr
         <CardHeader>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
+              {company?.logo ? (
+                <div className="h-9 w-9 rounded-full bg-gray-100 flex items-center justify-center text-lg">
+                  {company.logo}
+                </div>
+              ) : null}
+              <div className="flex flex-col">
+                {company?.name ? (
+                  <span className="text-sm text-gray-600">{company.name}</span>
+                ) : null}
+                <CardTitle>Land Acquisition Application</CardTitle>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-600">Step {currentStep} of 4 ({Math.round(progress)}%)</span>
               <Button type="button" variant="outline" size="sm" className="gap-2" onClick={onClose}>
                 <ArrowLeft className="h-4 w-4" />
                 Back
               </Button>
-              <CardTitle>Land Acquisition Application</CardTitle>
             </div>
-            <span className="text-sm text-gray-600">Step {currentStep} of 4 ({Math.round(progress)}%)</span>
           </div>
           <Progress value={progress} className="h-2" />
         </CardHeader>
@@ -392,10 +415,11 @@ export function LandAcquisitionForm({ property, onClose }: LandAcquisitionFormPr
                         <SelectValue placeholder="Select financing method" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Cash Payment">Cash Payment</SelectItem>
-                        <SelectItem value="Mortgage/Loan">Mortgage/Loan</SelectItem>
-                        <SelectItem value="Mixed (Cash + Loan)">Mixed (Cash + Loan)</SelectItem>
-                        <SelectItem value="Installment Plan">Installment Plan</SelectItem>
+                        {financingOptions.map((m) => (
+                          <SelectItem key={m} value={m}>
+                            {m}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   )}

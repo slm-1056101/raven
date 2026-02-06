@@ -7,7 +7,7 @@ import { MyApplications } from '@/app/components/MyApplications';
 import { useApp } from '@/app/context/AppContext';
 
 export function ClientPortal() {
-  const { logout, setCurrentView, currentCompany, currentUser } = useApp();
+  const { logout, currentUser } = useApp();
   const [activeTab, setActiveTab] = useState('marketplace');
 
   return (
@@ -17,9 +17,9 @@ export function ClientPortal() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="text-3xl">{currentCompany?.logo || '🏢'}</div>
+              <div className="text-3xl">🏢</div>
               <div>
-                <h1 className="text-2xl font-bold">{currentCompany?.name || 'Property Management'}</h1>
+                <h1 className="text-2xl font-bold">Suwokono</h1>
                 <p className="text-sm text-gray-600">Client Portal</p>
               </div>
             </div>
@@ -32,12 +32,6 @@ export function ClientPortal() {
               )}
               <Button variant="outline" onClick={logout}>
                 Logout
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={() => setCurrentView('company-selection')}
-              >
-                Switch Company
               </Button>
             </div>
           </div>

@@ -1,5 +1,7 @@
 from django.db.models import QuerySet
+from django.db.models import Q
 from django.utils import timezone
+from rest_framework.exceptions import PermissionDenied
 from rest_framework import viewsets
 from rest_framework import status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -121,6 +123,9 @@ class ActiveCompanyView(APIView):
 
         user = request.user
 
+        if getattr(user, 'role', None) == 'Client':
+            return Response({'detail': 'Clients cannot set active company'}, status=403)
+
         if getattr(user, 'role', None) == 'SuperAdmin':
             company = Company.objects.get(id=company_id)
             user.company = company
@@ -184,6 +189,45 @@ class PublicApplicationsView(APIView):
         return Response(ApplicationSerializer(application, context={'request': request}).data, status=201)
 
 
+class PublicApplicationPrecheckView(APIView):
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        summary='Public application precheck',
+        description=(
+            'Public endpoint to check if a client account exists for an email and whether that email has already '
+            'submitted an application for a given inventory (property).'
+        ),
+        responses={
+            200: OpenApiResponse(description='Precheck result'),
+            400: OpenApiResponse(description='Validation error'),
+        },
+    )
+    def get(self, request):
+        email = (request.query_params.get('email') or '').strip().lower()
+        property_id = request.query_params.get('propertyId')
+        company_id = request.query_params.get('companyId')
+
+        if not email:
+            return Response({'detail': 'email is required'}, status=400)
+        if not property_id:
+            return Response({'detail': 'propertyId is required'}, status=400)
+
+        user_exists = User.objects.filter(email__iexact=email).exists()
+
+        apps_qs = Application.objects.filter(property_id=property_id, applicant_email__iexact=email)
+        if company_id:
+            apps_qs = apps_qs.filter(company_id=company_id)
+        already_applied = apps_qs.exists()
+
+        return Response(
+            {
+                'userExists': user_exists,
+                'alreadyApplied': already_applied,
+            }
+        )
+
+
 class TenantScopedViewSetMixin:
     def _tenant_company_id(self):
         user = self.request.user
@@ -218,6 +262,9 @@ class CompanyViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
     def get_queryset(self) -> QuerySet:
         user = self.request.user
         if getattr(user, 'role', None) == 'SuperAdmin':
+            return Company.objects.all().order_by('name')
+
+        if getattr(user, 'role', None) == 'Client':
             return Company.objects.all().order_by('name')
 
         membership_ids = list(user.company_memberships.values_list('company_id', flat=True))
@@ -257,8 +304,7 @@ class UserViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
             return User.objects.none()
 
         return (
-            User.objects.filter(company_id=tenant_company_id)
-            .exclude(role='SuperAdmin')
+            User.objects.filter(company_id=tenant_company_id, role=User.Role.ADMIN)
             .order_by('email')
         )
 
@@ -268,9 +314,25 @@ class UserViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         return UserSerializer
 
     def get_permissions(self):
-        if self.action in ('list', 'retrieve', 'update', 'partial_update'):
+        if self.action in ('list', 'retrieve', 'update', 'partial_update', 'create'):
             return [IsAdminOrSuperAdmin()]
         return [IsSuperAdmin()]
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if getattr(user, 'role', None) == 'SuperAdmin':
+            serializer.save()
+            return
+
+        tenant_company_id = self._tenant_company_id()
+        if not tenant_company_id:
+            return
+
+        role = serializer.validated_data.get('role')
+        if role != User.Role.ADMIN:
+            raise PermissionDenied('Company admins can only create Admin users')
+
+        serializer.save(company_id=tenant_company_id, is_staff=True)
 
 
 @extend_schema_view(
@@ -286,6 +348,10 @@ class PropertyViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
     parser_classes = (JSONParser, MultiPartParser, FormParser)
 
     def get_queryset(self) -> QuerySet:
+        user = self.request.user
+        if getattr(user, 'role', None) == 'Client':
+            return Property.objects.none()
+
         tenant_company_id = self._tenant_company_id()
         if tenant_company_id:
             return Property.objects.filter(company_id=tenant_company_id, deleted_at__isnull=True).order_by('-id')
@@ -327,6 +393,15 @@ class ApplicationViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
     parser_classes = (JSONParser, MultiPartParser, FormParser)
 
     def get_queryset(self) -> QuerySet:
+        user = self.request.user
+        if getattr(user, 'role', None) == 'Client':
+            return (
+                Application.objects.filter(
+                    Q(user_id=user.id) | Q(applicant_email__iexact=user.email)
+                )
+                .order_by('-id')
+            )
+
         tenant_company_id = self._tenant_company_id()
         if tenant_company_id:
             return Application.objects.filter(company_id=tenant_company_id).order_by('-id')
@@ -343,7 +418,7 @@ class ApplicationViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
             serializer.save()
             return
         if getattr(user, 'role', None) == 'Client':
-            serializer.save(company_id=user.company_id, user=user)
+            serializer.save(user=user)
             return
         serializer.save(company_id=user.company_id)
 

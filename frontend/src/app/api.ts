@@ -18,11 +18,26 @@ export async function apiFetch<T>(
     try {
       if (contentType.includes('application/json')) {
         const data: any = await res.json();
+
+        const firstFieldError = (value: any): string | null => {
+          if (!value || typeof value !== 'object') return null;
+          for (const key of Object.keys(value)) {
+            const v = (value as any)[key];
+            if (typeof v === 'string' && v) return v;
+            if (Array.isArray(v) && v.length > 0) {
+              const first = v[0];
+              if (typeof first === 'string' && first) return first;
+            }
+          }
+          return null;
+        };
+
         const message =
           (typeof data?.detail === 'string' && data.detail) ||
           (typeof data?.message === 'string' && data.message) ||
           (typeof data?.error === 'string' && data.error) ||
           (Array.isArray(data?.non_field_errors) && data.non_field_errors[0]) ||
+          firstFieldError(data) ||
           (typeof data === 'string' && data);
 
         if (message) {

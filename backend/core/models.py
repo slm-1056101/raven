@@ -115,9 +115,12 @@ class Property(models.Model):
         SOLD = 'Sold'
 
     class Type(models.TextChoices):
-        RESIDENTIAL = 'Residential'
-        COMMERCIAL = 'Commercial'
+        PROPERTY_RENTALS = 'Property Rentals'
+        COMMERCIAL_RENTALS = 'Commercial Rentals'
         AGRICULTURAL = 'Agricultural'
+        LAND_FOR_SALE = 'Land For Sale'
+        CAR_RENTALS = 'Car Rentals'
+        OTHER = 'Other'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
@@ -134,16 +137,32 @@ class Property(models.Model):
     size = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.AVAILABLE)
-    type = models.CharField(max_length=16, choices=Type.choices, default=Type.RESIDENTIAL)
+    type = models.CharField(max_length=64, choices=Type.choices, default=Type.LAND_FOR_SALE)
 
     image = models.ImageField(upload_to='properties/', blank=True, null=True)
     layout_image = models.FileField(upload_to='properties/layouts/', blank=True, null=True)
     features = models.JSONField(default=list, blank=True)
 
+    financing_methods = models.JSONField(default=list, blank=True)
+
     deleted_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self) -> str:
         return self.title
+
+
+class PropertyImage(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='images')
+    image = models.ImageField(upload_to='properties/images/', blank=False, null=False)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['order', 'created_at']
+
+    def __str__(self) -> str:
+        return f"{self.property_id} - {self.image.name}"
 
 
 class Application(models.Model):

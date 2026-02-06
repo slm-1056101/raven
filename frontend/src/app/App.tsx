@@ -1,6 +1,8 @@
 import { AppProvider, useApp } from '@/app/context/AppContext';
 import { LandingPage } from '@/app/components/LandingPage';
 import { CompanyLanding } from '@/app/components/CompanyLanding';
+import { InventoryTypeLanding } from '@/app/components/InventoryTypeLanding';
+import { PublicLandAcquisitionForm } from '@/app/components/PublicLandAcquisitionForm';
 import { Login } from '@/app/components/Login';
 import { Signup } from '@/app/components/Signup';
 import { CompanySelection } from '@/app/components/CompanySelection';
@@ -19,15 +21,16 @@ function AppContent() {
   return (
     <>
       {currentView === 'landing' && <LandingPage />}
-      {currentView === 'companies-landing' && <LandingPage />}
       {currentView === 'company-landing' && <CompanyLanding />}
-      {currentView === 'public-application' && <LandingPage />}
+      {currentView === 'inventory-type' && <InventoryTypeLanding />}
       {currentView === 'login' && <Login />}
       {currentView === 'signup' && <Signup />}
       {currentView === 'company-selection' && <CompanySelection />}
       {currentView === 'client' && <ClientPortal />}
       {currentView === 'admin' && <AdminDashboard />}
       {currentView === 'super-admin' && <SuperAdminDashboard />}
+      {currentView === 'public-application' && <PublicLandAcquisitionForm />}
+      {currentView === 'companies-landing' && <LandingPage />}
       <Toaster />
     </>
   );
